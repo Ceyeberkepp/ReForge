@@ -1,6 +1,8 @@
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from ldap3 import Connection, Server, Tls
 from sqlalchemy.orm import Session
+import ssl
 from .database import Base, engine, get_db
 from . import models, schemas
 
@@ -58,7 +60,10 @@ def create_department(payload: schemas.DepartmentCreate, db: Session = Depends(g
 
 @app.get("/api/software", response_model=list[schemas.SoftwareOut])
 def list_software(db: Session = Depends(get_db)):
-    return db.query(models.SoftwarePackage).order_by(models.SoftwarePackage.install_order, models.SoftwarePackage.name).all()
+    return db.query(models.SoftwarePackage).order_by(
+        models.SoftwarePackage.install_order,
+        models.SoftwarePackage.name
+    ).all()
 
 @app.post("/api/software", response_model=schemas.SoftwareOut)
 def create_software(payload: schemas.SoftwareCreate, db: Session = Depends(get_db)):
@@ -94,6 +99,38 @@ def update_directory(payload: schemas.DirectoryConfigIn, db: Session = Depends(g
         setattr(item, key, value)
     db.commit(); db.refresh(item)
     return item
+
+@app.post("/api/directory/test")
+def test_directory(payload: schemas.DirectoryTestRequest):
+    use_ssl = payload.protocol.lower() == "ldaps"
+    tls = Tls(validate=ssl.CERT_REQUIRED) if use_ssl else None
+    try:
+        server = Server(
+            payload.domain_controller,
+            port=payload.port,
+            use_ssl=use_ssl,
+            tls=tls,
+            connect_timeout=5,
+        )
+        conn = Connection(
+            server,
+            user=payload.service_account,
+            password=payload.password.get_secret_value(),
+            auto_bind=True,
+            receive_timeout=5,
+        )
+        conn.unbind()
+        return {
+            "ok": True,
+            "message": "Directory bind succeeded",
+            "server": payload.domain_controller,
+            "protocol": payload.protocol,
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Directory bind failed: {type(exc).__name__}: {exc}",
+        )
 
 @app.get("/api/deployments", response_model=list[schemas.DeploymentOut])
 def list_deployments(db: Session = Depends(get_db)):
