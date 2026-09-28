@@ -689,3 +689,13 @@ func (a *App) listAudit(w http.ResponseWriter, r *http.Request) {
 	a.db.Order("at desc").Limit(500).Find(&rows)
 	writeJSON(w, 200, rows)
 }
+
+
+func (a *App) workerNextJob(w http.ResponseWriter, r *http.Request) {
+	var row DeploymentJob
+	if a.db.Where("status = ?", "queued").Order("created_at asc").First(&row).Error != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, 200, deploymentDTO(row))
+}
