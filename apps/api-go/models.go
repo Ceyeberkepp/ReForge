@@ -20,6 +20,7 @@ type Config struct {
 	AdminUser          string
 	AdminPassword      string
 	AllowedOrigin      string
+	WorkerToken        string
 	AllowInsecureLDAP  bool
 }
 
@@ -38,6 +39,7 @@ func loadConfig() Config {
 		AdminUser:         env("REFORGE_ADMIN_USER", "admin"),
 		AdminPassword:     env("REFORGE_ADMIN_PASSWORD", ""),
 		AllowedOrigin:     env("REFORGE_ALLOWED_ORIGIN", "http://localhost:5173"),
+		WorkerToken:       env("REFORGE_WORKER_TOKEN", ""),
 		AllowInsecureLDAP: strings.EqualFold(env("REFORGE_ALLOW_INSECURE_LDAP", "false"), "true"),
 	}
 }
