@@ -1,4 +1,4 @@
-FROM node:22.20.0-bookworm-slim AS build
+FROM node:24.11.0-bookworm-slim AS build
 WORKDIR /app
 COPY package.json ./
 RUN npm install --ignore-scripts
