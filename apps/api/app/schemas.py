@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from .models import DeploymentStatus
 
 class ORMModel(BaseModel):
@@ -27,6 +27,10 @@ class DepartmentCreate(BaseModel):
     image_id: str | None = None
     computer_name_pattern: str = "{DEPT}-{SERIAL}"
     ad_ou: str = ""
+    required_software_ids: list[str] = Field(default_factory=list)
+    optional_software_ids: list[str] = Field(default_factory=list)
+    printers: list[str] = Field(default_factory=list)
+    post_install_scripts: list[str] = Field(default_factory=list)
     config: dict[str, Any] = Field(default_factory=dict)
 
 class DepartmentOut(DepartmentCreate, ORMModel):
@@ -68,6 +72,9 @@ class DirectoryConfigIn(BaseModel):
 
 class DirectoryConfigOut(DirectoryConfigIn, ORMModel):
     id: str
+
+class DirectoryTestRequest(DirectoryConfigIn):
+    password: SecretStr
 
 class DeploymentCreate(BaseModel):
     host_id: str
