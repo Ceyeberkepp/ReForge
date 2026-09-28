@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
 def uuid_str() -> str:
@@ -37,6 +37,10 @@ class Department(Base):
     image_id: Mapped[str | None] = mapped_column(ForeignKey("gold_images.id"), nullable=True)
     computer_name_pattern: Mapped[str] = mapped_column(String(100), default="{DEPT}-{SERIAL}")
     ad_ou: Mapped[str] = mapped_column(String(500), default="")
+    required_software_ids: Mapped[list] = mapped_column(JSON, default=list)
+    optional_software_ids: Mapped[list] = mapped_column(JSON, default=list)
+    printers: Mapped[list] = mapped_column(JSON, default=list)
+    post_install_scripts: Mapped[list] = mapped_column(JSON, default=list)
     config: Mapped[dict] = mapped_column(JSON, default=dict)
 
 class SoftwarePackage(Base):
