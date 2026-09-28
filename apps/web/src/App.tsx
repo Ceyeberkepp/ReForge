@@ -1,100 +1,66 @@
-import { useEffect, useState } from "react";
-import {
-  Boxes, Building2, Computer, HardDrive, LayoutDashboard,
-  Package, Rocket, Settings, ShieldCheck
-} from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { Boxes, Building2, Computer, HardDrive, LayoutDashboard, Package, Rocket, Settings, ShieldCheck, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle, Loader2, Network, Database } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080";
+type Stats={images:number;departments:number;software:number;hosts:number;queued_deployments:number;running_deployments?:number};
+type Img={id:string;name:string;os_name:string;os_version:string;architecture:string;image_version:string;image_path?:string|null;sysprep_ready:boolean;checksum?:string|null;notes:string};
+type Sw={id:string;name:string;version:string;installer_path:string;silent_install:string;detection_rule:string;uninstall_command:string;install_order:number;required_by_default:boolean};
+type Dept={id:string;name:string;code:string;image_id?:string|null;computer_name_pattern:string;ad_ou:string;required_software_ids:string[];optional_software_ids:string[];printers:string[];post_install_scripts:string[];config:any};
+type Host={id:string;hostname:string;mac_address:string;serial_number:string;manufacturer:string;model:string;department_id?:string|null;last_seen?:string|null};
+type Job={id:string;host_id:string;image_id:string;department_id?:string|null;optional_software:string[];status:string;progress:number;current_step:string;created_at:string};
+type Dir={id?:string;domain:string;domain_controller:string;protocol:string;port:number;base_dn:string;service_account:string;default_computer_ou:string};
 
-type Stats = {
-  images:number; departments:number; software:number; hosts:number; queued_deployments:number;
-};
+const nav=[["Dashboard",LayoutDashboard],["Gold Images",HardDrive],["Departments",Building2],["Software",Package],["Hosts",Computer],["Deployments",Rocket],["Directory Services",ShieldCheck],["PXE / Network",Network],["Settings",Settings]] as const;
+async function req(path:string,init?:RequestInit){const r=await fetch(API+path,{...init,headers:{"Content-Type":"application/json",...(init?.headers||{})}});if(!r.ok){let m=r.status+" "+r.statusText;try{const b=await r.json();m=b.detail||b.message||m}catch{}throw new Error(m)}return r.status===204?null:r.json()}
+const img0={name:"",os_name:"Windows 11 Enterprise",os_version:"",architecture:"x86_64",image_version:"1.0",image_path:"",sysprep_ready:false,checksum:"",notes:""};
+const sw0={name:"",version:"",installer_path:"",silent_install:"",detection_rule:"",uninstall_command:"",install_order:100,required_by_default:false};
+const host0={hostname:"",mac_address:"",serial_number:"",manufacturer:"",model:"",department_id:""};
+const dept0={name:"",code:"",image_id:"",computer_name_pattern:"{DEPT}-{SERIAL}",ad_ou:"",required_software_ids:[] as string[],optional_software_ids:[] as string[],printers:"",post_install_scripts:""};
+const dir0:Dir={domain:"",domain_controller:"",protocol:"ldaps",port:636,base_dn:"",service_account:"",default_computer_ou:""};
 
-const nav = [
-  ["Dashboard", LayoutDashboard],
-  ["Gold Images", HardDrive],
-  ["Departments", Building2],
-  ["Software", Package],
-  ["Hosts", Computer],
-  ["Deployments", Rocket],
-  ["Directory Services", ShieldCheck],
-  ["Settings", Settings],
-] as const;
-
-export function App() {
-  const [active, setActive] = useState("Dashboard");
-  const [stats, setStats] = useState<Stats>({
-    images:0, departments:0, software:0, hosts:0, queued_deployments:0
-  });
-
-  useEffect(() => {
-    fetch(`${API}/api/dashboard`).then(r => r.json()).then(setStats).catch(() => {});
-  }, []);
-
-  return <div className="shell">
-    <aside>
-      <div className="brand"><div className="brandmark"><Boxes size={21}/></div>
-        <div><strong>ReForge</strong><span>Deployment Platform</span></div>
-      </div>
-      <nav>{nav.map(([label, Icon]) =>
-        <button key={label} className={active===label?"active":""} onClick={()=>setActive(label)}>
-          <Icon size={18}/><span>{label}</span>
-        </button>
-      )}</nav>
-      <div className="version">ReForge v0.1.0</div>
-    </aside>
-
-    <main>
-      <header>
-        <div><span className="eyebrow">CONTROL PLANE</span><h1>{active}</h1></div>
-        <button className="primary">+ New deployment</button>
-      </header>
-
-      {active === "Dashboard" ? <Dashboard stats={stats}/> :
-        <section className="panel empty">
-          <div className="iconCircle">{nav.find(n=>n[0]===active)?.[1]({size:26} as any)}</div>
-          <h2>{active}</h2>
-          <p>This module is wired into the ReForge navigation and API foundation. Its full management workflow is next.</p>
-        </section>}
-    </main>
-  </div>
+export function App(){
+ const [active,setActive]=useState("Dashboard"),[stats,setStats]=useState<Stats>({images:0,departments:0,software:0,hosts:0,queued_deployments:0}),[images,setImages]=useState<Img[]>([]),[software,setSoftware]=useState<Sw[]>([]),[departments,setDepartments]=useState<Dept[]>([]),[hosts,setHosts]=useState<Host[]>([]),[jobs,setJobs]=useState<Job[]>([]),[directory,setDirectory]=useState<Dir>(dir0),[error,setError]=useState(""),[notice,setNotice]=useState(""),[loading,setLoading]=useState(true);
+ async function refresh(silent=false){if(!silent)setLoading(true);try{const a=await Promise.all([req("/api/dashboard"),req("/api/images"),req("/api/software"),req("/api/departments"),req("/api/hosts"),req("/api/deployments"),req("/api/directory")]);setStats(a[0]);setImages(a[1]);setSoftware(a[2]);setDepartments(a[3]);setHosts(a[4]);setJobs(a[5]);setDirectory(a[6]);setError("")}catch(e:any){setError(e.message)}finally{if(!silent)setLoading(false)}}
+ useEffect(()=>{refresh();const t=setInterval(()=>refresh(true),4000);return()=>clearInterval(t)},[]);
+ let page:any=<Dashboard stats={stats} jobs={jobs} hosts={hosts} images={images}/>;
+ if(active==="Gold Images")page=<Images items={images} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Software")page=<Software items={software} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Departments")page=<Departments items={departments} images={images} software={software} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Hosts")page=<Hosts items={hosts} departments={departments} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Deployments")page=<Deployments items={jobs} hosts={hosts} images={images} departments={departments} software={software} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Directory Services")page=<Directory value={directory} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="PXE / Network")page=<PXE/>;
+ if(active==="Settings")page=<SettingsPage/>;
+ return <div className="shell"><aside><div className="brand"><div className="brandmark"><Boxes size={21}/></div><div><strong>ReForge</strong><span>Deployment Platform</span></div></div><nav>{nav.map(([l,I])=><button key={l} className={active===l?"active":""} onClick={()=>setActive(l)}><I size={18}/><span>{l}</span></button>)}</nav><div className="version">ReForge v0.2.0</div></aside><main><header><div><span className="eyebrow">CONTROL PLANE</span><h1>{active}</h1></div><button className="secondary" onClick={()=>refresh()}><RefreshCw size={15}/> Refresh</button></header>{error&&<Alert kind="error" text={error} close={()=>setError("")}/>} {notice&&<Alert kind="success" text={notice} close={()=>setNotice("")}/>} {loading?<div className="loading"><Loader2 className="spin"/> Loading ReForge...</div>:page}</main></div>
 }
 
-function Dashboard({stats}:{stats:Stats}) {
-  const cards = [
-    ["Gold Images", stats.images, "Ready for deployment"],
-    ["Departments", stats.departments, "Deployment profiles"],
-    ["Software Packages", stats.software, "Catalog items"],
-    ["Managed Hosts", stats.hosts, "Registered endpoints"],
-  ];
-  return <>
-    <section className="hero">
-      <div><span className="statusDot"/>SYSTEM READY</div>
-      <h2>Build once. Deploy everywhere.</h2>
-      <p>Gold images, department profiles, application packages, and directory integration in one deployment control plane.</p>
-    </section>
-
-    <section className="stats">
-      {cards.map(([name,value,sub])=><article key={name as string}>
-        <span>{name}</span><strong>{value}</strong><small>{sub}</small>
-      </article>)}
-    </section>
-
-    <section className="grid">
-      <article className="panel">
-        <div className="panelTitle"><div><h3>Deployment Pipeline</h3><p>Standard endpoint provisioning flow</p></div></div>
-        <div className="pipeline">
-          {["PXE Boot","Gold Image","Drivers","Department","Applications","Join AD","Updates","Complete"].map((x,i)=>
-            <div className="step" key={x}><b>{String(i+1).padStart(2,"0")}</b><span>{x}</span></div>
-          )}
-        </div>
-      </article>
-      <article className="panel queue">
-        <h3>Deployment Queue</h3>
-        <div className="queueNumber">{stats.queued_deployments}</div>
-        <p>Jobs waiting to run</p>
-        <button>View deployments</button>
-      </article>
-    </section>
-  </>;
+function Dashboard(p:{stats:Stats;jobs:Job[];hosts:Host[];images:Img[]}){const c=[["Gold Images",p.stats.images],["Departments",p.stats.departments],["Software Packages",p.stats.software],["Managed Hosts",p.stats.hosts]];return <><section className="hero"><div><span className="statusDot"/>SYSTEM READY</div><h2>Build once. Deploy everywhere.</h2><p>Gold images, department profiles, application packages, PXE hosts and directory integration in one deployment control plane.</p></section><section className="stats">{c.map(x=><article key={String(x[0])}><span>{x[0]}</span><strong>{x[1]}</strong><small>Managed by ReForge</small></article>)}</section><section className="grid"><article className="panel"><h3>Deployment Pipeline</h3><div className="pipeline">{["PXE Boot","Gold Image","Drivers","Department","Applications","Join AD","Updates","Complete"].map((x,i)=><div className="step" key={x}><b>{String(i+1).padStart(2,"0")}</b><span>{x}</span></div>)}</div></article><article className="panel queue"><h3>Live Queue</h3><div className="queueNumber">{p.stats.queued_deployments}</div><p>{p.stats.running_deployments||0} running</p></article></section><section className="panel sectionGap"><h3>Recent Deployments</h3><table><thead><tr><th>Host</th><th>Image</th><th>Status</th><th>Progress</th><th>Step</th></tr></thead><tbody>{p.jobs.slice(0,5).map(j=><tr key={j.id}><td>{p.hosts.find(h=>h.id===j.host_id)?.hostname||j.host_id.slice(0,8)}</td><td>{p.images.find(i=>i.id===j.image_id)?.name||"Unknown"}</td><td><Status v={j.status}/></td><td><Progress v={j.progress}/></td><td>{j.current_step}</td></tr>)}{!p.jobs.length&&<Empty cols={5}/>}</tbody></table></section></>}
 }
+
+function Images(p:any){const [f,setF]=useState<any>(img0),[edit,setEdit]=useState<string|null>(null);async function save(e:FormEvent){e.preventDefault();try{await req(edit?"/api/images/"+edit:"/api/images",{method:edit?"PUT":"POST",body:JSON.stringify(f)});setF(img0);setEdit(null);p.note("Gold image saved");p.changed()}catch(e:any){p.err(e.message)}}async function del(id:string){if(confirm("Delete this gold image?"))try{await req("/api/images/"+id,{method:"DELETE"});p.changed()}catch(e:any){p.err(e.message)}}return <Crud title="Gold Images" help="Maintain generalized, versioned Windows or Linux source images." form={<form onSubmit={save} className="formGrid"><F l="Image name"><input required value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></F><F l="Operating system"><input value={f.os_name} onChange={e=>setF({...f,os_name:e.target.value})}/></F><F l="OS version/build"><input value={f.os_version} onChange={e=>setF({...f,os_version:e.target.value})}/></F><F l="Image version"><input value={f.image_version} onChange={e=>setF({...f,image_version:e.target.value})}/></F><F l="Storage path"><input value={f.image_path||""} onChange={e=>setF({...f,image_path:e.target.value})}/></F><label className="check"><input type="checkbox" checked={f.sysprep_ready} onChange={e=>setF({...f,sysprep_ready:e.target.checked})}/> Sysprep / generalized</label><Save editing={!!edit} cancel={()=>{setEdit(null);setF(img0)}}/></form>}><Cards>{p.items.map((x:Img)=><Card key={x.id} title={x.name} sub={x.os_name+" "+x.os_version+" • v"+x.image_version}><div className="meta"><span>{x.architecture}</span><span>{x.sysprep_ready?"Sysprep ready":"Not generalized"}</span></div><p>{x.image_path||"No storage path"}</p><Actions edit={()=>{setEdit(x.id);setF({...x})}} del={()=>del(x.id)}/></Card>)}</Cards></Crud>}
+
+function Software(p:any){const [f,setF]=useState<any>(sw0),[edit,setEdit]=useState<string|null>(null);async function save(e:FormEvent){e.preventDefault();try{await req(edit?"/api/software/"+edit:"/api/software",{method:edit?"PUT":"POST",body:JSON.stringify({...f,install_order:Number(f.install_order)})});setF(sw0);setEdit(null);p.note("Software saved");p.changed()}catch(e:any){p.err(e.message)}}async function seed(){try{const r=await req("/api/software/bootstrap",{method:"POST"});p.note(String(r.created)+" starter packages added");p.changed()}catch(e:any){p.err(e.message)}}async function del(id:string){if(confirm("Delete this package?"))try{await req("/api/software/"+id,{method:"DELETE"});p.changed()}catch(e:any){p.err(e.message)}}return <Crud title="Software Catalog" help="Store installers and silent install logic once, then assign packages to departments." extra={<button className="secondary" onClick={seed}><Database size={15}/> Load starter catalog</button>} form={<form onSubmit={save} className="formGrid"><F l="Application"><input required value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></F><F l="Version"><input value={f.version} onChange={e=>setF({...f,version:e.target.value})}/></F><F l="Installer path"><input value={f.installer_path} onChange={e=>setF({...f,installer_path:e.target.value})}/></F><F l="Install order"><input type="number" value={f.install_order} onChange={e=>setF({...f,install_order:e.target.value})}/></F><F l="Silent command" wide><input value={f.silent_install} onChange={e=>setF({...f,silent_install:e.target.value})}/></F><F l="Detection rule" wide><input value={f.detection_rule} onChange={e=>setF({...f,detection_rule:e.target.value})}/></F><Save editing={!!edit} cancel={()=>{setEdit(null);setF(sw0)}}/></form>}><table><thead><tr><th>Application</th><th>Version</th><th>Order</th><th>Silent command</th><th></th></tr></thead><tbody>{p.items.map((x:Sw)=><tr key={x.id}><td><b>{x.name}</b></td><td>{x.version||"—"}</td><td>{x.install_order}</td><td className="mono">{x.silent_install||"Not configured"}</td><td><Actions edit={()=>{setEdit(x.id);setF({...x})}} del={()=>del(x.id)}/></td></tr>)}{!p.items.length&&<Empty cols={5}/>}</tbody></table></Crud>}
+
+function Departments(p:any){const [f,setF]=useState<any>(dept0),[edit,setEdit]=useState<string|null>(null);function tog(k:string,id:string){const a=f[k] as string[];setF({...f,[k]:a.includes(id)?a.filter(x=>x!==id):a.concat(id)})}async function save(e:FormEvent){e.preventDefault();try{const body={...f,image_id:f.image_id||null,printers:String(f.printers).split("\n").filter(Boolean),post_install_scripts:String(f.post_install_scripts).split("\n").filter(Boolean),config:{}};await req(edit?"/api/departments/"+edit:"/api/departments",{method:edit?"PUT":"POST",body:JSON.stringify(body)});setF(dept0);setEdit(null);p.note("Department profile saved");p.changed()}catch(e:any){p.err(e.message)}}async function del(id:string){if(confirm("Delete department?"))try{await req("/api/departments/"+id,{method:"DELETE"});p.changed()}catch(e:any){p.err(e.message)}}return <Crud title="Department Profiles" help="Layer department configuration and software on top of a reusable gold image." form={<form onSubmit={save} className="formGrid"><F l="Department"><input required value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></F><F l="Code"><input required value={f.code} onChange={e=>setF({...f,code:e.target.value.toUpperCase()})}/></F><F l="Gold image"><select value={f.image_id||""} onChange={e=>setF({...f,image_id:e.target.value})}><option value="">Select image</option>{p.images.map((x:Img)=><option value={x.id} key={x.id}>{x.name}</option>)}</select></F><F l="Computer naming"><input value={f.computer_name_pattern} onChange={e=>setF({...f,computer_name_pattern:e.target.value})}/></F><F l="Active Directory OU" wide><input value={f.ad_ou} onChange={e=>setF({...f,ad_ou:e.target.value})}/></F><F l="Required software" wide><Choices data={p.software} selected={f.required_software_ids} change={(id:string)=>tog("required_software_ids",id)}/></F><F l="Optional software" wide><Choices data={p.software} selected={f.optional_software_ids} change={(id:string)=>tog("optional_software_ids",id)}/></F><F l="Printers"><textarea value={f.printers} onChange={e=>setF({...f,printers:e.target.value})}/></F><F l="Post-install scripts"><textarea value={f.post_install_scripts} onChange={e=>setF({...f,post_install_scripts:e.target.value})}/></F><Save editing={!!edit} cancel={()=>{setEdit(null);setF(dept0)}}/></form>}><Cards>{p.items.map((x:Dept)=><Card key={x.id} title={x.name} sub={x.code+" • "+(p.images.find((i:Img)=>i.id===x.image_id)?.name||"No image")}><p className="mono">{x.ad_ou||"No AD OU"}</p><div className="meta"><span>{x.required_software_ids.length} required apps</span><span>{x.optional_software_ids.length} optional</span></div><Actions edit={()=>{setEdit(x.id);setF({...x,printers:(x.printers||[]).join("\n"),post_install_scripts:(x.post_install_scripts||[]).join("\n")})}} del={()=>del(x.id)}/></Card>)}</Cards></Crud>}
+
+function Hosts(p:any){const [f,setF]=useState<any>(host0),[edit,setEdit]=useState<string|null>(null);async function save(e:FormEvent){e.preventDefault();try{await req(edit?"/api/hosts/"+edit:"/api/hosts",{method:edit?"PUT":"POST",body:JSON.stringify({...f,department_id:f.department_id||null})});setF(host0);setEdit(null);p.note("Host saved");p.changed()}catch(e:any){p.err(e.message)}}async function del(id:string){if(confirm("Delete host?"))try{await req("/api/hosts/"+id,{method:"DELETE"});p.changed()}catch(e:any){p.err(e.message)}}return <Crud title="Managed Hosts" help="Register endpoints manually or automatically through the PXE inventory flow." form={<form onSubmit={save} className="formGrid"><F l="Hostname"><input required value={f.hostname} onChange={e=>setF({...f,hostname:e.target.value})}/></F><F l="MAC address"><input required value={f.mac_address} onChange={e=>setF({...f,mac_address:e.target.value})}/></F><F l="Serial number"><input value={f.serial_number} onChange={e=>setF({...f,serial_number:e.target.value})}/></F><F l="Manufacturer"><input value={f.manufacturer} onChange={e=>setF({...f,manufacturer:e.target.value})}/></F><F l="Model"><input value={f.model} onChange={e=>setF({...f,model:e.target.value})}/></F><F l="Department"><select value={f.department_id||""} onChange={e=>setF({...f,department_id:e.target.value})}><option value="">Unassigned</option>{p.departments.map((d:Dept)=><option key={d.id} value={d.id}>{d.name}</option>)}</select></F><Save editing={!!edit} cancel={()=>{setEdit(null);setF(host0)}}/></form>}><table><thead><tr><th>Hostname</th><th>MAC</th><th>Hardware</th><th>Department</th><th></th></tr></thead><tbody>{p.items.map((x:Host)=><tr key={x.id}><td><b>{x.hostname}</b><small className="block">{x.serial_number}</small></td><td className="mono">{x.mac_address}</td><td>{(x.manufacturer+" "+x.model).trim()||"—"}</td><td>{p.departments.find((d:Dept)=>d.id===x.department_id)?.name||"Unassigned"}</td><td><Actions edit={()=>{setEdit(x.id);setF({...x,department_id:x.department_id||""})}} del={()=>del(x.id)}/></td></tr>)}{!p.items.length&&<Empty cols={5}/>}</tbody></table></Crud>}
+
+function Deployments(p:any){const [f,setF]=useState<any>({host_id:"",image_id:"",department_id:"",optional_software:[]});const dept=p.departments.find((d:Dept)=>d.id===f.department_id);const offered=p.software.filter((s:Sw)=>dept?.optional_software_ids.includes(s.id));useEffect(()=>{if(dept?.image_id)setF((x:any)=>({...x,image_id:dept.image_id,optional_software:[]}))},[f.department_id]);function tog(id:string){setF({...f,optional_software:f.optional_software.includes(id)?f.optional_software.filter((x:string)=>x!==id):f.optional_software.concat(id)})}async function save(e:FormEvent){e.preventDefault();try{await req("/api/deployments",{method:"POST",body:JSON.stringify({...f,department_id:f.department_id||null})});setF({host_id:"",image_id:"",department_id:"",optional_software:[]});p.note("Deployment queued");p.changed()}catch(e:any){p.err(e.message)}}async function act(id:string,a:string){try{await req("/api/deployments/"+id+"/"+a,{method:"POST"});p.changed()}catch(e:any){p.err(e.message)}}return <Crud title="Deployments" help="Queue a host for imaging, department customization, software installation and directory join." form={<form onSubmit={save} className="formGrid"><F l="Host"><select required value={f.host_id} onChange={e=>setF({...f,host_id:e.target.value})}><option value="">Select host</option>{p.hosts.map((h:Host)=><option value={h.id} key={h.id}>{h.hostname+" — "+h.mac_address}</option>)}</select></F><F l="Department"><select value={f.department_id} onChange={e=>setF({...f,department_id:e.target.value})}><option value="">No department</option>{p.departments.map((d:Dept)=><option value={d.id} key={d.id}>{d.name}</option>)}</select></F><F l="Gold image"><select required value={f.image_id} onChange={e=>setF({...f,image_id:e.target.value})}><option value="">Select image</option>{p.images.map((i:Img)=><option value={i.id} key={i.id}>{i.name}</option>)}</select></F><F l="Optional applications" wide><Choices data={offered} selected={f.optional_software} change={tog}/></F><div className="wide"><button className="primary" type="submit"><Play size={15}/> Queue deployment</button></div></form>}><table><thead><tr><th>Host</th><th>Image / Department</th><th>Status</th><th>Progress</th><th>Step</th><th></th></tr></thead><tbody>{p.items.map((j:Job)=><tr key={j.id}><td><b>{p.hosts.find((h:Host)=>h.id===j.host_id)?.hostname||"Unknown"}</b></td><td>{p.images.find((i:Img)=>i.id===j.image_id)?.name||"Unknown"}<small className="block">{p.departments.find((d:Dept)=>d.id===j.department_id)?.name||"No department"}</small></td><td><Status v={j.status}/></td><td><Progress v={j.progress}/></td><td>{j.current_step}</td><td>{["failed","canceled"].includes(j.status)&&<button className="iconBtn" onClick={()=>act(j.id,"retry")}><RefreshCw size={15}/></button>}{["queued","running"].includes(j.status)&&<button className="iconBtn danger" onClick={()=>act(j.id,"cancel")}><XCircle size={15}/></button>}</td></tr>)}{!p.items.length&&<Empty cols={6}/>}</tbody></table></Crud>}
+
+function Directory(p:any){const [f,setF]=useState<Dir>(p.value),[password,setPassword]=useState("");useEffect(()=>setF(p.value),[p.value]);async function save(e:FormEvent){e.preventDefault();try{await req("/api/directory",{method:"PUT",body:JSON.stringify(f)});p.note("Directory settings saved");p.changed()}catch(e:any){p.err(e.message)}}async function test(){try{const r=await req("/api/directory/test",{method:"POST",body:JSON.stringify({...f,password})});p.note(r.message)}catch(e:any){p.err(e.message)}}return <section className="panel"><h3>Active Directory / LDAP</h3><p>Use LDAPS where available. The test password is not stored.</p><form onSubmit={save} className="formGrid formWrap"><F l="Domain"><input value={f.domain} onChange={e=>setF({...f,domain:e.target.value})}/></F><F l="Domain controller"><input value={f.domain_controller} onChange={e=>setF({...f,domain_controller:e.target.value})}/></F><F l="Protocol"><select value={f.protocol} onChange={e=>setF({...f,protocol:e.target.value,port:e.target.value==="ldaps"?636:389})}><option value="ldaps">LDAPS</option><option value="ldap">LDAP</option></select></F><F l="Port"><input type="number" value={f.port} onChange={e=>setF({...f,port:Number(e.target.value)})}/></F><F l="Base DN" wide><input value={f.base_dn} onChange={e=>setF({...f,base_dn:e.target.value})}/></F><F l="Service account"><input value={f.service_account} onChange={e=>setF({...f,service_account:e.target.value})}/></F><F l="Default computer OU"><input value={f.default_computer_ou} onChange={e=>setF({...f,default_computer_ou:e.target.value})}/></F><F l="Password for test"><input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></F><div className="formButtons wide"><button className="primary">Save settings</button><button className="secondary" type="button" disabled={!password} onClick={test}><ShieldCheck size={15}/> Test connection</button></div></form></section>}
+
+function PXE(){const url=API+"/boot/ipxe?api_url="+encodeURIComponent(API);return <div className="stack"><section className="panel"><h3>PXE / iPXE Entry Point</h3><p>Chain your existing DHCP/PXE environment to this URL.</p><div className="codeBox">{url}</div><div className="infoGrid"><div><b>Legacy BIOS</b><span>undionly.kpxe</span></div><div><b>UEFI x64</b><span>ipxe.efi</span></div><div><b>Boot menu</b><span>/boot/ipxe</span></div></div></section><section className="panel"><h3>Network deployment flow</h3><div className="pipeline">{["DHCP/PXE","iPXE","ReForge Menu","Host Lookup","Assigned Job","Imaging Node","Post Install","Complete"].map((x,i)=><div className="step" key={x}><b>{String(i+1).padStart(2,"0")}</b><span>{x}</span></div>)}</div></section><section className="panel warningPanel"><h3>Safe imaging mode</h3><p>The control plane and deployment queue are active. Raw disk capture/restore stays disabled until the dedicated ReForge imaging environment is attached.</p></section></div>}
+
+function SettingsPage(){return <div className="stack"><section className="panel"><h3>Server</h3><div className="settingsRows"><div><span>API URL</span><b className="mono">{API}</b></div><div><span>Worker</span><b>Queue enabled</b></div><div><span>Database</span><b>PostgreSQL</b></div></div></section><section className="panel"><h3>Platform capabilities</h3><div className="tagCloud">{["Gold images","Department profiles","Software catalog","PXE/iPXE","Host inventory","Deployment queue","LDAPS test","AD OU mapping","Image capture adapter","Driver packs","Multicast","Wake-on-LAN"].map(x=><span key={x}>{x}</span>)}</div></section></div>}
+
+function Crud(p:any){const [show,setShow]=useState(false);return <div className="stack"><section className="panel"><div className="sectionHead"><div><h3>{p.title}</h3><p>{p.help}</p></div><div className="toolbar">{p.extra}<button className="primary" onClick={()=>setShow(!show)}><Plus size={15}/>{show?"Close":"Add new"}</button></div></div>{show&&<div className="formWrap">{p.form}</div>}</section><section className="panel">{p.children}</section></div>}
+function F(p:{l:string;wide?:boolean;children:any}){return <label className={p.wide?"field wide":"field"}><span>{p.l}</span>{p.children}</label>}
+function Save(p:{editing:boolean;cancel:()=>void}){return <div className="formButtons wide"><button className="primary" type="submit">{p.editing?"Save changes":"Create"}</button>{p.editing&&<button className="secondary" type="button" onClick={p.cancel}>Cancel edit</button>}</div>}
+function Choices(p:{data:Sw[];selected:string[];change:(id:string)=>void}){return <div className="choiceGrid">{p.data.length?p.data.map(s=><label className="choice" key={s.id}><input type="checkbox" checked={p.selected.includes(s.id)} onChange={()=>p.change(s.id)}/><span><b>{s.name}</b><small>{s.version||"Package"}</small></span></label>):<span className="muted">No software packages yet.</span>}</div>}
+function Cards(p:any){return <div className="cards">{p.children}</div>}
+function Card(p:any){return <article className="itemCard"><div><h4>{p.title}</h4><small>{p.sub}</small></div>{p.children}</article>}
+function Actions(p:{edit:()=>void;del:()=>void}){return <div className="rowActions"><button onClick={p.edit}>Edit</button><button className="danger" onClick={p.del}><Trash2 size={14}/> Delete</button></div>}
+function Empty(p:{cols:number}){return <tr><td colSpan={p.cols} className="emptyCell">No records yet.</td></tr>}
+function Status(p:{v:string}){return <span className={"status "+p.v}>{p.v}</span>}
+function Progress(p:{v:number}){return <div className="progress"><div style={{width:String(p.v)+"%"}}/><span>{p.v}%</span></div>}
+function Alert(p:{kind:string;text:string;close:()=>void}){return <div className={"alert "+p.kind}>{p.kind==="success"?<CheckCircle2 size={17}/>:<XCircle size={17}/>}<span>{p.text}</span><button onClick={p.close}>×</button></div>}
