@@ -10,6 +10,7 @@ def uuid_str() -> str:
 
 class DeploymentStatus(str, enum.Enum):
     queued = "queued"
+    waiting = "waiting"
     running = "running"
     succeeded = "succeeded"
     failed = "failed"
