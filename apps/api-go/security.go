@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -55,6 +56,9 @@ func (a *App) bootstrapAdmin() error {
 	}
 	if count > 0 {
 		return nil
+	}
+	if len(a.cfg.AdminPassword) < 12 {
+		return errors.New("REFORGE_ADMIN_PASSWORD must be at least 12 characters on first startup")
 	}
 	u := User{
 		ID:           uuid.NewString(),
@@ -153,5 +157,28 @@ func (a *App) auth(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey, &u)))
+	})
+}
+
+
+func (a *App) workerAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(a.cfg.WorkerToken) < 32 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"detail": "worker token is not configured"})
+			return
+		}
+		const prefix = "Bearer "
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, prefix) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "worker authentication required"})
+			return
+		}
+		got := []byte(strings.TrimPrefix(auth, prefix))
+		want := []byte(a.cfg.WorkerToken)
+		if len(got) != len(want) || subtle.ConstantTimeCompare(got, want) != 1 {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "invalid worker token"})
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
