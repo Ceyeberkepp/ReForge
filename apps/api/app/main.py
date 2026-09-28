@@ -330,13 +330,13 @@ menu ReForge Network Deployment
 item register Register / inventory this computer
 item deploy Check for assigned deployment
 item local Boot from local disk
-choose --default deploy --timeout 5000 target && goto ${target}
+choose --default deploy --timeout 5000 target && goto ${{target}}
 
 :register
-chain ${reforge-api}/boot/register.ipxe?mac=${net0/mac} || shell
+chain ${{reforge-api}}/boot/register.ipxe?mac=${{net0/mac}} || shell
 
 :deploy
-chain ${reforge-api}/boot/deploy.ipxe?mac=${net0/mac} || goto local
+chain ${{reforge-api}}/boot/deploy.ipxe?mac=${{net0/mac}} || goto local
 
 :local
 exit
