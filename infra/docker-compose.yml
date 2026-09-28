@@ -70,8 +70,8 @@ services:
       REFORGE_ALLOWED_ORIGIN: ${REFORGE_ALLOWED_ORIGIN}
       REFORGE_WORKER_TOKEN: ${REFORGE_WORKER_TOKEN}
       REFORGE_ALLOW_INSECURE_LDAP: "false"
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -96,12 +96,10 @@ services:
   web:
     build:
       context: ../apps/web
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
     depends_on:
       - api
     ports:
-      - "5173:5173"
+      - "5173:8080"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
