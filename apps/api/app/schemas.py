@@ -61,6 +61,13 @@ class HostOut(HostCreate, ORMModel):
     id: str
     last_seen: datetime | None = None
 
+class HostRegistration(BaseModel):
+    mac_address: str
+    serial_number: str = ""
+    manufacturer: str = ""
+    model: str = ""
+    hostname: str | None = None
+
 class DirectoryConfigIn(BaseModel):
     domain: str = ""
     domain_controller: str = ""
@@ -88,3 +95,8 @@ class DeploymentOut(DeploymentCreate, ORMModel):
     progress: int
     current_step: str
     created_at: datetime
+
+class WorkerUpdate(BaseModel):
+    status: DeploymentStatus | None = None
+    progress: int | None = Field(default=None, ge=0, le=100)
+    current_step: str | None = None
