@@ -10,19 +10,36 @@ command -v docker >/dev/null 2>&1 || {
   echo "Docker Engine is required." >&2
   exit 1
 }
+command -v openssl >/dev/null 2>&1 || {
+  echo "OpenSSL is required to generate installation secrets." >&2
+  exit 1
+}
 docker compose version >/dev/null 2>&1 || {
   echo "Docker Compose plugin is required." >&2
   exit 1
 }
 
 secret() {
-  tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-32}"
+  openssl rand -hex 24
 }
 
 ROOT="${REFORGE_ROOT:-/opt/reforge}"
-mkdir -p "${ROOT}"
-if [[ "$(pwd)" != "${ROOT}" ]]; then
-  cp -a . "${ROOT}/"
+if [[ -f "./infra/docker-compose.yml" ]]; then
+  mkdir -p "${ROOT}"
+  if [[ "$(pwd)" != "${ROOT}" ]]; then
+    cp -a . "${ROOT}/"
+  fi
+elif [[ ! -f "${ROOT}/infra/docker-compose.yml" ]]; then
+  command -v git >/dev/null 2>&1 || {
+    echo "Git is required for one-command installation." >&2
+    exit 1
+  }
+  if [[ -e "${ROOT}" && -n "$(ls -A "${ROOT}" 2>/dev/null || true)" ]]; then
+    echo "${ROOT} exists and is not a ReForge installation." >&2
+    exit 1
+  fi
+  rm -rf "${ROOT}"
+  git clone --depth 1 https://github.com/Ceyeberkepp/ReForge.git "${ROOT}"
 fi
 cd "${ROOT}"
 
