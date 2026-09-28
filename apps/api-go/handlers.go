@@ -699,3 +699,32 @@ func (a *App) workerNextJob(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, deploymentDTO(row))
 }
+
+
+func (a *App) changePassword(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if json.NewDecoder(r.Body).Decode(&input) != nil {
+		writeJSON(w, 400, map[string]string{"detail": "invalid request"})
+		return
+	}
+	if len(input.NewPassword) < 12 {
+		writeJSON(w, 400, map[string]string{"detail": "new password must be at least 12 characters"})
+		return
+	}
+	u := a.currentUser(r)
+	if u == nil || !verifyPassword(u.PasswordHash, input.CurrentPassword) {
+		a.audit(r, "password-change", "user", "", false, "current password rejected")
+		writeJSON(w, 401, map[string]string{"detail": "current password is incorrect"})
+		return
+	}
+	u.PasswordHash = hashPassword(input.NewPassword)
+	if a.db.Save(u).Error != nil {
+		writeJSON(w, 500, map[string]string{"detail": "password could not be changed"})
+		return
+	}
+	a.audit(r, "password-change", "user", u.ID, true, "")
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
