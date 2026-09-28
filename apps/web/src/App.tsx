@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Boxes, Building2, Computer, HardDrive, LayoutDashboard, Package, Rocket, Settings, ShieldCheck, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle, Loader2, Network, Database } from "lucide-react";
+import { Boxes, Building2, Computer, HardDrive, LayoutDashboard, Package, Rocket, Settings, ShieldCheck, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle, Loader2, Network, Database, ClipboardList, KeyRound } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 type Stats={images:number;departments:number;software:number;hosts:number;queued_deployments:number;running_deployments?:number};
@@ -10,7 +10,7 @@ type Host={id:string;hostname:string;mac_address:string;serial_number:string;man
 type Job={id:string;host_id:string;image_id:string;department_id?:string|null;optional_software:string[];status:string;progress:number;current_step:string;created_at:string};
 type Dir={id?:string;domain:string;domain_controller:string;protocol:string;port:number;base_dn:string;service_account:string;default_computer_ou:string};
 
-const nav=[["Dashboard",LayoutDashboard],["Gold Images",HardDrive],["Departments",Building2],["Software",Package],["Hosts",Computer],["Deployments",Rocket],["Directory Services",ShieldCheck],["PXE / Network",Network],["Settings",Settings]] as const;
+const nav=[["Dashboard",LayoutDashboard],["Gold Images",HardDrive],["Departments",Building2],["Software",Package],["Hosts",Computer],["Deployments",Rocket],["Directory Services",ShieldCheck],["PXE / Network",Network],["Audit",ClipboardList],["Settings",Settings]] as const;
 async function req(path:string,init?:RequestInit){const r=await fetch(API+path,{...init,credentials:"include",headers:{"Content-Type":"application/json",...(init?.headers||{})}});if(!r.ok){let m=r.status+" "+r.statusText;try{const b=await r.json();m=b.detail||b.message||m}catch{}throw new Error(m)}return r.status===204?null:r.json()}
 const img0={name:"",os_name:"Windows 11 Enterprise",os_version:"",architecture:"x86_64",image_version:"1.0",image_path:"",sysprep_ready:false,checksum:"",notes:""};
 const sw0={name:"",version:"",installer_path:"",silent_install:"",detection_rule:"",uninstall_command:"",install_order:100,required_by_default:false};
@@ -30,7 +30,7 @@ export function App(){
  if(active==="Deployments")page=<Deployments items={jobs} hosts={hosts} images={images} departments={departments} software={software} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Directory Services")page=<Directory value={directory} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="PXE / Network")page=<PXE/>;
- if(active==="Settings")page=<SettingsPage/>;
+ if(active==="Audit")page=<AuditPage/>;\n if(active==="Settings")page=<SettingsPage/>;
  if(auth===null)return <div className="loadingScreen"><Loader2 className="spin"/> Starting ReForge...</div>;\n if(!auth)return <Login onSuccess={()=>{setAuth(true);refresh()}}/>;\n async function logout(){try{await req("/api/auth/logout",{method:"POST"})}finally{setAuth(false)}}\n return <div className="shell"><aside><div className="brand"><div className="brandmark"><Boxes size={21}/></div><div><strong>ReForge</strong><span>Deployment Platform</span></div></div><nav>{nav.map(([l,I])=><button key={l} className={active===l?"active":""} onClick={()=>setActive(l)}><I size={18}/><span>{l}</span></button>)}</nav><div className="version"><button className="logoutBtn" onClick={logout}>Sign out</button><span>ReForge v0.3.0</span></div></aside><main><header><div><span className="eyebrow">CONTROL PLANE</span><h1>{active}</h1></div><button className="secondary" onClick={()=>refresh()}><RefreshCw size={15}/> Refresh</button></header>{error&&<Alert kind="error" text={error} close={()=>setError("")}/>} {notice&&<Alert kind="success" text={notice} close={()=>setNotice("")}/>} {loading?<div className="loading"><Loader2 className="spin"/> Loading ReForge...</div>:page}</main></div>
 }
 
@@ -86,7 +86,22 @@ function PXE(){
   <section className="panel"><h3>PXE validation checklist</h3><div className="checkList">{["DHCP reachable from deployment VLAN","BIOS and UEFI boot files available","HTTP access to ReForge web/API","Unknown-device registration policy reviewed","Imaging node attached before disk operations"].map((x,i)=><div key={x}><span>{i+1}</span><b>{x}</b></div>)}</div></section>
  </div>
 }
-function SettingsPage(){return <div className="stack"><section className="panel"><h3>Server</h3><div className="settingsRows"><div><span>API URL</span><b className="mono">{API}</b></div><div><span>Worker</span><b>Queue enabled</b></div><div><span>Database</span><b>PostgreSQL</b></div></div></section><section className="panel"><h3>Platform capabilities</h3><div className="tagCloud">{["Gold images","Department profiles","Software catalog","PXE/iPXE","Host inventory","Deployment queue","LDAPS test","AD OU mapping","Image capture adapter","Driver packs","Multicast","Wake-on-LAN"].map(x=><span key={x}>{x}</span>)}</div></section></div>}
+function SettingsPage(){
+ const [health,setHealth]=useState<any>(null),[current,setCurrent]=useState(""),[next,setNext]=useState(""),[confirm,setConfirm]=useState(""),[msg,setMsg]=useState("");
+ useEffect(()=>{fetch("/health").then(r=>r.json()).then(setHealth).catch(()=>{})},[]);
+ async function changePassword(e:FormEvent){e.preventDefault();setMsg("");if(next!==confirm){setMsg("New passwords do not match");return}try{await req("/api/auth/password",{method:"POST",body:JSON.stringify({current_password:current,new_password:next})});setCurrent("");setNext("");setConfirm("");setMsg("Password changed")}catch(e:any){setMsg(e.message)}}
+ return <div className="stack">
+  <section className="panel"><h3>Server</h3><div className="settingsRows"><div><span>API status</span><b>{health?.status||"Checking..."}</b></div><div><span>Version</span><b>{health?.version||"—"}</b></div><div><span>Primary database</span><b>{health?.database||"—"}</b></div><div><span>Runtime</span><b>Go control plane + Go worker</b></div></div></section>
+  <section className="panel"><h3>Administrator password</h3><p>Rotate the local administrator password. Use SSO/MFA when identity federation is added.</p><form className="formGrid formWrap" onSubmit={changePassword}><F l="Current password"><input type="password" value={current} onChange={e=>setCurrent(e.target.value)}/></F><div></div><F l="New password"><input type="password" minLength={12} value={next} onChange={e=>setNext(e.target.value)}/></F><F l="Confirm new password"><input type="password" minLength={12} value={confirm} onChange={e=>setConfirm(e.target.value)}/></F><div className="formButtons wide"><button className="primary"><KeyRound size={15}/> Change password</button>{msg&&<span className="savedText">{msg}</span>}</div></form></section>
+  <section className="panel"><h3>Security posture</h3><div className="tagCloud">{["Authenticated admin API","Argon2id passwords","Audit events","Secure cookies","Exact-origin CORS","LDAPS / StartTLS","Non-root containers","Dependency scans","Secret scans","Isolated imaging node"].map(x=><span key={x}>{x}</span>)}</div></section>
+ </div>
+}
+
+function AuditPage(){
+ const [rows,setRows]=useState<any[]>([]),[error,setError]=useState("");
+ useEffect(()=>{req("/api/audit").then(setRows).catch((e:any)=>setError(e.message))},[]);
+ return <section className="panel"><div className="sectionHead"><div><h3>Audit log</h3><p>Administrative security and configuration activity recorded by ReForge.</p></div></div>{error&&<div className="alert error">{error}</div>}<table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>Source</th><th>Result</th></tr></thead><tbody>{rows.map(x=><tr key={x.id}><td>{new Date(x.at).toLocaleString()}</td><td><b>{x.actor}</b></td><td>{x.action}</td><td>{x.resource}{x.resource_id?" / "+x.resource_id.slice(0,8):""}</td><td className="mono">{x.remote_ip}</td><td><span className={"status "+(x.success?"succeeded":"failed")}>{x.success?"Success":"Failed"}</span></td></tr>)}{!rows.length&&<Empty cols={6}/>}</tbody></table></section>
+}
 
 function Crud(p:any){const [show,setShow]=useState(false);return <div className="stack"><section className="panel"><div className="sectionHead"><div><h3>{p.title}</h3><p>{p.help}</p></div><div className="toolbar">{p.extra}<button className="primary" onClick={()=>setShow(!show)}><Plus size={15}/>{show?"Close":"Add new"}</button></div></div>{show&&<div className="formWrap">{p.form}</div>}</section><section className="panel">{p.children}</section></div>}
 function F(p:{l:string;wide?:boolean;children:any}){return <label className={p.wide?"field wide":"field"}><span>{p.l}</span>{p.children}</label>}
