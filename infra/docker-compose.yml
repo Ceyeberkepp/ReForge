@@ -1,53 +1,116 @@
 services:
-  db:
-    image: postgres:16
+  postgres:
+    image: postgres:17.6-bookworm
+    profiles: ["postgres"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-reforge}
       POSTGRES_USER: ${POSTGRES_USER:-reforge}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - reforge-db:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - reforge-postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reforge} -d ${POSTGRES_DB:-reforge}"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:11.8.3
+    profiles: ["mariadb"]
+    environment:
+      MARIADB_DATABASE: ${MYSQL_DATABASE:-reforge}
+      MARIADB_USER: ${MYSQL_USER:-reforge}
+      MARIADB_PASSWORD: ${MYSQL_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - reforge-mariadb:/var/lib/mysql
+    restart: unless-stopped
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    profiles: ["sqlserver"]
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - reforge-sqlserver:/var/opt/mssql
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:8.0.13-noble
+    profiles: ["mongodb"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-reforge}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - reforge-mongodb:/data/db
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5.26.12-community-bullseye
+    profiles: ["neo4j"]
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH}
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1g
+    volumes:
+      - reforge-neo4j:/data
+    restart: unless-stopped
 
   api:
     build:
-      context: ../apps/api
+      context: ../apps/api-go
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://reforge:change-me@db:5432/reforge}
-    depends_on:
-      db:
-        condition: service_healthy
+      REFORGE_DB_DRIVER: ${REFORGE_DB_DRIVER}
+      REFORGE_DB_DSN: ${REFORGE_DB_DSN}
+      REFORGE_ADMIN_USER: ${REFORGE_ADMIN_USER:-admin}
+      REFORGE_ADMIN_PASSWORD: ${REFORGE_ADMIN_PASSWORD}
+      REFORGE_ALLOWED_ORIGIN: ${REFORGE_ALLOWED_ORIGIN}
+      REFORGE_WORKER_TOKEN: ${REFORGE_WORKER_TOKEN}
+      REFORGE_ALLOW_INSECURE_LDAP: "false"
     ports:
       - "8080:8080"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   worker:
     build:
-      context: ../apps/worker
+      context: ../apps/worker-go
     environment:
       REFORGE_API_URL: http://api:8080
-      REFORGE_WORKER_POLL_SECONDS: 3
+      REFORGE_WORKER_TOKEN: ${REFORGE_WORKER_TOKEN}
       REFORGE_EXECUTE_PRIVILEGED: "false"
     depends_on:
       - api
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   web:
     build:
       context: ../apps/web
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+      VITE_API_URL: ${VITE_API_URL}
     depends_on:
       - api
     ports:
       - "5173:5173"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
-  reforge-db:
+  reforge-postgres:
+  reforge-mariadb:
+  reforge-sqlserver:
+  reforge-mongodb:
+  reforge-neo4j:
