@@ -51,7 +51,7 @@ func main() {
 		protected.Use(app.auth)
 
 		protected.Get("/api/auth/me", app.me)
-		protected.Post("/api/auth/logout", app.logout)
+		protected.Post("/api/auth/logout", app.logout)\n\t\tprotected.Post("/api/auth/password", app.changePassword)
 
 		protected.Get("/api/dashboard", app.dashboard)
 
