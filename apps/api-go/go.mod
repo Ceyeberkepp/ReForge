@@ -3,7 +3,7 @@ module github.com/Ceyeberkepp/ReForge/apps/api-go
 go 1.27
 
 require (
-	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/go-ldap/ldap/v3 v3.4.10
