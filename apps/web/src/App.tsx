@@ -21,7 +21,8 @@ const dir0:Dir={domain:"",domain_controller:"",protocol:"ldaps",port:636,base_dn
 export function App(){
  const [auth,setAuth]=useState<null|boolean>(null),[active,setActive]=useState("Dashboard"),[stats,setStats]=useState<Stats>({images:0,departments:0,software:0,hosts:0,queued_deployments:0}),[images,setImages]=useState<Img[]>([]),[software,setSoftware]=useState<Sw[]>([]),[departments,setDepartments]=useState<Dept[]>([]),[hosts,setHosts]=useState<Host[]>([]),[jobs,setJobs]=useState<Job[]>([]),[directory,setDirectory]=useState<Dir>(dir0),[error,setError]=useState(""),[notice,setNotice]=useState(""),[loading,setLoading]=useState(true);
  async function refresh(silent=false){if(!silent)setLoading(true);try{const a=await Promise.all([req("/api/dashboard"),req("/api/images"),req("/api/software"),req("/api/departments"),req("/api/hosts"),req("/api/deployments"),req("/api/directory")]);setStats(a[0]);setImages(a[1]);setSoftware(a[2]);setDepartments(a[3]);setHosts(a[4]);setJobs(a[5]);setDirectory(a[6]);setError("")}catch(e:any){setError(e.message)}finally{if(!silent)setLoading(false)}}
- useEffect(()=>{req("/api/auth/me").then(()=>{setAuth(true);refresh()}).catch(()=>setAuth(false))},[]);\n useEffect(()=>{if(!auth)return;const t=setInterval(()=>refresh(true),4000);return()=>clearInterval(t)},[auth]);
+ useEffect(()=>{req("/api/auth/me").then(()=>{setAuth(true);refresh()}).catch(()=>setAuth(false))},[]);
+ useEffect(()=>{if(!auth)return;const t=setInterval(()=>refresh(true),4000);return()=>clearInterval(t)},[auth]);
  let page:any=<Dashboard stats={stats} jobs={jobs} hosts={hosts} images={images}/>;
  if(active==="Gold Images")page=<Images items={images} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Software")page=<Software items={software} changed={refresh} err={setError} note={setNotice}/>;
