@@ -1,86 +1,185 @@
 # ReForge
 
-ReForge is a modern PXE imaging and endpoint deployment platform inspired by the flexibility of FOG Project and the workflow of Microsoft WDS/MDT.
+ReForge is a modern PXE imaging and endpoint deployment platform inspired by Microsoft WDS/MDT workflows and the flexibility of FOG Project.
 
-## Goals
+## What is implemented
 
-ReForge is designed around reusable deployment layers instead of maintaining a separate monolithic image for every department:
+ReForge now includes a working control-plane MVP:
+
+- React management console
+- FastAPI REST API
+- PostgreSQL persistence
+- Docker Compose deployment
+- Gold image CRUD
+- Department deployment profiles
+- Required and optional software per department
+- Starter software catalog
+- Host inventory and MAC registration
+- Deployment queue, progress and retry/cancel controls
+- Deployment-plan resolver
+- Active Directory / LDAP configuration
+- LDAPS bind testing without storing the supplied password
+- Department OU and naming rules
+- iPXE menu generation
+- PXE host lookup
+- Separate deployment worker
+- Linux hardware-registration helper
+- Windows post-image bootstrap
+- Installer script
+- PXE/network documentation
+
+## Deployment model
+
+ReForge avoids maintaining a separate monolithic image for every department.
 
 ```
 Gold Image
-  -> Hardware/Driver Profile
+  -> Hardware / Driver Profile
   -> Department Profile
   -> Required Software
   -> Optional Software
-  -> Active Directory / Entra configuration
-  -> Post-deployment tasks
+  -> Computer Naming
+  -> Active Directory / OU
+  -> Printers
+  -> Post-install Scripts
+  -> Updates
+  -> Validation
 ```
 
-## Phase 1
+A single maintained Windows 11 gold image can therefore serve Finance, HR, IT, Clinical and other departments.
 
-The initial platform includes:
+## Important imaging-node status
 
-- Gold image catalog and version metadata
-- Department deployment profiles
-- Software/application catalog
-- Host inventory
-- Deployment jobs and status
-- Active Directory connection settings
-- Computer naming rules and OU assignment
-- Modern web dashboard
-- API-first architecture
-- PostgreSQL persistence
-- Docker Compose development stack
+The management server does **not** currently execute destructive raw-disk operations.
 
-## Planned imaging capabilities
+Jobs move to **Waiting for imaging node** until a dedicated privileged imaging environment is attached. This is intentional: the web/API containers should never be able to wipe a disk simply because they can reach an endpoint.
 
-- BIOS and UEFI PXE/iPXE boot
-- Host registration from PXE
-- Image capture and restore
-- Windows Sysprep-aware gold images
-- Linux image support
-- Driver packs
-- Multicast deployment
-- Wake-on-LAN
-- Unattended Windows setup
-- Post-image agent
-- Domain join / OU placement
-- Software installation and detection rules
-- PowerShell and shell post-deployment scripts
-- Deployment templates and visual workflow designer
-- Audit logs and role-based access
+The dedicated imaging-node adapter will own:
+
+- target-disk discovery and confirmation
+- partitioning
+- image capture
+- image restore
+- compression
+- checksums
+- driver injection
+- multicast
+- imaging kernel/initramfs
+- signed short-lived deployment tokens
+
+## Install
+
+On a Debian/Ubuntu server with Docker Engine and the Docker Compose plugin:
+
+```bash
+git clone https://github.com/Ceyeberkepp/ReForge.git
+cd ReForge
+sudo bash install.sh
+```
+
+Or start manually:
+
+```bash
+cp .env.example .env
+docker compose -f infra/docker-compose.yml up -d --build
+```
+
+Default services:
+
+- Web UI: http://SERVER:5173
+- API: http://SERVER:8080
+- API documentation: http://SERVER:8080/docs
+- PostgreSQL: SERVER:5432
+
+## PXE / iPXE
+
+ReForge exposes its generated boot menu at:
+
+```
+http://SERVER:8080/boot/ipxe?api_url=http://SERVER:8080
+```
+
+Typical boot files:
+
+- Legacy BIOS: `undionly.kpxe`
+- UEFI x64: `ipxe.efi`
+
+ReForge is designed to coexist with an existing DHCP server rather than requiring DHCP replacement. See `docs/pxe-setup.md`.
+
+## Active Directory
+
+Directory Services supports connection metadata for:
+
+- domain FQDN
+- domain controller
+- LDAP or LDAPS
+- port
+- Base DN
+- service account
+- default computer OU
+
+The UI can perform a real LDAP/LDAPS bind test. The test password is accepted only for that request and is not written to the database.
+
+Department profiles can assign their own OU and computer naming rule such as:
+
+```
+FIN-{SERIAL}
+HR-{SERIAL}
+IT-{SERIAL}
+```
+
+## Software catalog
+
+Applications are stored independently from gold images. ReForge can model packages such as:
+
+- Adobe Acrobat Reader
+- Microsoft 365
+- Microsoft Teams
+- Chrome
+- Firefox
+- 7-Zip
+- VLC
+- Power BI
+- VS Code
+- PuTTY
+- WinSCP
+- Zoom
+- GlobalProtect
+- NinjaOne
+
+Each package can carry its installer location, version, install order, silent-install command, detection rule and uninstall command.
 
 ## Repository layout
 
 ```
 apps/
-  api/        FastAPI control plane
-  web/        React/Vite management UI
+  api/          FastAPI control plane
+  web/          React/Vite management UI
+  worker/       deployment orchestration worker
+
+imaging/
+  register-host.sh
+  windows-postinstall.ps1
+
 infra/
   docker-compose.yml
+  dnsmasq.example.conf
+
 docs/
   architecture.md
+  pxe-setup.md
+  windows-deployment.md
 ```
 
-## Development
+## Security model
 
-Copy the example environment file and start the stack:
+ReForge must never persist plaintext Active Directory passwords. Production join credentials should be stored in encrypted secret storage and exposed only to the privileged deployment worker for the duration of an authorized deployment.
 
-```bash
-cp .env.example .env
-docker compose -f infra/docker-compose.yml up --build
-```
+Raw disk operations should require a short-lived signed job token tied to the deployment, endpoint identity and selected target disk.
 
-Default services:
+## Current version
 
-- Web UI: http://localhost:5173
-- API: http://localhost:8080
-- API docs: http://localhost:8080/docs
-- PostgreSQL: localhost:5432
-
-## Security
-
-ReForge must never store plaintext Active Directory passwords. The initial API accepts connection metadata only; encrypted secret storage and a dedicated privileged deployment worker are part of the next implementation phase.
+Control-plane MVP: **0.2.0**
 
 ## License
 
