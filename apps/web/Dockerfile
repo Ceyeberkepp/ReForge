@@ -1,7 +1,12 @@
-FROM node:22-alpine
+FROM node:22.20.0-bookworm-slim AS build
 WORKDIR /app
-COPY package.json .
-RUN npm install
+COPY package.json ./
+RUN npm install --ignore-scripts
 COPY . .
-EXPOSE 5173
-CMD ["npm", "run", "dev"]
+ENV VITE_API_URL=""
+RUN npm run build
+
+FROM nginxinc/nginx-unprivileged:1.29.1-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 8080
