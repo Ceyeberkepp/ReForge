@@ -30,21 +30,28 @@ def patch(client, job_id, **payload):
 
 def process(client, job):
     job_id = job["id"]
-    patch(client, job_id, status="running", progress=1, current_step="Starting")
     plan = client.get(f"{API}/api/deployments/{job_id}/plan")
     plan.raise_for_status()
-    plan = plan.json()
 
-    # Safe MVP mode: orchestrates and validates the deployment plan without
-    # running destructive disk commands. A dedicated imaging-node adapter will
-    # replace this block when REFORGE_EXECUTE_PRIVILEGED is enabled.
+    if not EXECUTE_PRIVILEGED:
+        patch(
+            client,
+            job_id,
+            status="waiting",
+            progress=0,
+            current_step="Waiting for imaging node",
+        )
+        return
+
+    patch(client, job_id, status="running", progress=1, current_step="Starting")
+
     for progress, step in STEPS:
         latest = client.get(f"{API}/api/deployments").json()
         current = next((x for x in latest if x["id"] == job_id), None)
         if not current or current["status"] == "canceled":
             return
         patch(client, job_id, progress=progress, current_step=step)
-        time.sleep(0.35 if not EXECUTE_PRIVILEGED else 1)
+        time.sleep(1)
 
     patch(client, job_id, status="succeeded", progress=100, current_step="Complete")
 
