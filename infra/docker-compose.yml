@@ -20,6 +20,17 @@ services:
     ports:
       - "8080:8080"
 
+  worker:
+    build:
+      context: ../apps/worker
+    environment:
+      REFORGE_API_URL: http://api:8080
+      REFORGE_WORKER_POLL_SECONDS: 3
+      REFORGE_EXECUTE_PRIVILEGED: "false"
+    depends_on:
+      - api
+    restart: unless-stopped
+
   web:
     build:
       context: ../apps/web
