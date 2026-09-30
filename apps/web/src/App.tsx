@@ -48,7 +48,9 @@ export function App(){
  if(active==="Task Sequences")page=<ModulePage icon={ListChecks} title="Task Sequences" description="Build ordered deployment workflows for imaging, drivers, applications, directory join, updates and validation." action="New task sequence" bullets={["Conditional deployment steps","Retries and timeouts","Windows, Linux and macOS filters"]}/>;
  if(active==="Drivers")page=<ModulePage icon={Wrench} title="Driver Packs" description="Organize driver packs by manufacturer, model, operating system and architecture." action="Add driver pack" bullets={["Model matching","Offline Windows injection","Versioned driver packs"]}/>;
  if(active==="Reports")page=<ModulePage icon={BarChart3} title="Reports" description="Deployment, image, host, driver and imaging-node operational reporting." action="Create report" bullets={["Deployment success and duration","Image usage and age","Hardware and OS inventory"]}/>;
- if(active==="Admin Center")page=<AdminCenter/>;
+ if(active==="Admin Center")page=<AdminCenter go={setActive}/>;
+ if(active==="Imaging Nodes")page=<ModulePage icon={Server} title="Imaging Nodes" description="Register and monitor privileged capture and restore workers." action="Register imaging node" bullets={["Signed deployment authorization","Node health and workload state","PXE imaging environment handoff"]}/>;
+ if(active==="Storage Nodes")page=<ModulePage icon={Database} title="Storage Nodes" description="Manage repositories for ISO, gold, clone and macOS deployment content." action="Add storage node" bullets={["Local, SMB, NFS and S3-compatible targets","Capacity and checksum health","Replication and retention"]}/>;
  if(auth===null)return <div className="loadingScreen"><Loader2 className="spin"/> Starting ReForge...</div>;
  if(!auth)return <Login onSuccess={()=>{setAuth(true);refresh()}}/>;
  async function logout(){try{await req("/api/auth/logout",{method:"POST"})}finally{setAuth(false)}}
@@ -126,13 +128,60 @@ function Directory(p:any){const [f,setF]=useState<Dir>(p.value),[password,setPas
 
 function PXE(){
  const [f,setF]=useState<any>(null),[saved,setSaved]=useState(false),[error,setError]=useState("");
- useEffect(()=>{req("/api/pxe").then(setF).catch((e:any)=>setError(e.message))},[]);
+ useEffect(()=>{req("/api/pxe").then((x:any)=>setF({
+   menu_title:"ReForge Deployment",default_item:"deploy",
+   show_deploy:true,show_register:true,show_diagnostics:true,show_local_boot:true,...x
+ })).catch((e:any)=>setError(e.message))},[]);
  if(!f)return <section className="panel"><div className="loading"><Loader2 className="spin"/> Loading PXE configuration...</div></section>;
- async function save(){try{await req("/api/pxe",{method:"PUT",body:JSON.stringify({...f,boot_menu_timeout:Number(f.boot_menu_timeout)})});setSaved(true);setTimeout(()=>setSaved(false),2500)}catch(e:any){setError(e.message)}}
+ async function save(){try{const updated=await req("/api/pxe",{method:"PUT",body:JSON.stringify({...f,boot_menu_timeout:Number(f.boot_menu_timeout)})});setF(updated);setSaved(true);setTimeout(()=>setSaved(false),2500)}catch(e:any){setError(e.message)}}
  const bootURL=(f.server_url||window.location.origin)+"/boot/ipxe";
+ const entries=[
+   ["deploy","Deploy assigned image",Boolean(f.show_deploy)],
+   ["register","Register this device",Boolean(f.show_register)],
+   ["diagnostics","Diagnostics and inventory",Boolean(f.show_diagnostics)],
+   ["local","Boot local disk",Boolean(f.show_local_boot)]
+ ] as const;
+ const visible=entries.filter(x=>x[2]);
+ function toggle(k:string,v:boolean){
+   const next={...f,[k]:v};
+   const nextEntries=[
+    ["deploy","show_deploy"],["register","show_register"],["diagnostics","show_diagnostics"],["local","show_local_boot"]
+   ].filter(([,key])=>Boolean(next[key]));
+   if(!nextEntries.some(([id])=>id===next.default_item)) next.default_item=nextEntries[0]?.[0]||"local";
+   setF(next);
+ }
  return <div className="stack">
-  <section className="panel"><div className="sectionHead"><div><h3>PXE boot service</h3><p>Configure ReForge to work with your existing DHCP service or a dedicated imaging network.</p></div><label className="switch"><input type="checkbox" checked={f.enabled} onChange={e=>setF({...f,enabled:e.target.checked})}/><span>{f.enabled?"Enabled":"Disabled"}</span></label></div>{error&&<div className="alert error">{error}</div>}<div className="formGrid formWrap"><F l="ReForge server URL"><input value={f.server_url} onChange={e=>setF({...f,server_url:e.target.value})}/></F><F l="DHCP integration"><select value={f.dhcp_mode} onChange={e=>setF({...f,dhcp_mode:e.target.value})}><option value="existing">Use existing DHCP server</option><option value="proxy">Proxy DHCP / imaging VLAN</option><option value="managed">ReForge-managed DHCP</option></select></F><F l="DHCP server"><input placeholder="10.0.0.10" value={f.dhcp_server||""} onChange={e=>setF({...f,dhcp_server:e.target.value})}/></F><F l="Next server / TFTP"><input placeholder="10.0.0.20" value={f.next_server||""} onChange={e=>setF({...f,next_server:e.target.value,tftp_server:e.target.value})}/></F><F l="Legacy BIOS boot file"><input value={f.bios_boot_file} onChange={e=>setF({...f,bios_boot_file:e.target.value})}/></F><F l="UEFI x64 boot file"><input value={f.uefi_boot_file} onChange={e=>setF({...f,uefi_boot_file:e.target.value})}/></F><F l="Boot menu timeout (seconds)"><input type="number" min="1" max="60" value={f.boot_menu_timeout} onChange={e=>setF({...f,boot_menu_timeout:Number(e.target.value)})}/></F><label className="check"><input type="checkbox" checked={f.allow_unknown} onChange={e=>setF({...f,allow_unknown:e.target.checked})}/> Allow unknown devices to reach registration</label><div className="wide formButtons"><button className="primary" onClick={save}>Save PXE settings</button>{saved&&<span className="savedText"><CheckCircle2 size={15}/> Saved</span>}</div></div></section>
-  <section className="panel"><h3>Boot configuration</h3><p>Point your DHCP/PXE service to iPXE, then chain to the ReForge menu.</p><div className="pxeSummary"><div><span>BIOS</span><b>{f.bios_boot_file}</b></div><div><span>UEFI x64</span><b>{f.uefi_boot_file}</b></div><div><span>Next server</span><b>{f.next_server||"Set your ReForge/TFTP server"}</b></div><div><span>ReForge chain URL</span><b className="mono">{bootURL}</b></div></div></section>
+  <section className="panel"><div className="sectionHead"><div><h3>PXE boot service</h3><p>Configure ReForge to work with your existing DHCP service or a dedicated imaging network.</p></div><label className="switch"><input type="checkbox" checked={f.enabled} onChange={e=>setF({...f,enabled:e.target.checked})}/><span>{f.enabled?"Enabled":"Disabled"}</span></label></div>{error&&<div className="alert error">{error}</div>}<div className="formGrid formWrap"><F l="ReForge server URL"><input value={f.server_url} onChange={e=>setF({...f,server_url:e.target.value})}/></F><F l="DHCP integration"><select value={f.dhcp_mode} onChange={e=>setF({...f,dhcp_mode:e.target.value})}><option value="existing">Use existing DHCP server</option><option value="proxy">Proxy DHCP / imaging VLAN</option><option value="managed">ReForge-managed DHCP</option></select></F><F l="DHCP server"><input placeholder="10.0.0.10" value={f.dhcp_server||""} onChange={e=>setF({...f,dhcp_server:e.target.value})}/></F><F l="Next server / TFTP"><input placeholder="10.0.0.20" value={f.next_server||""} onChange={e=>setF({...f,next_server:e.target.value,tftp_server:e.target.value})}/></F><F l="Legacy BIOS boot file"><input value={f.bios_boot_file} onChange={e=>setF({...f,bios_boot_file:e.target.value})}/></F><F l="UEFI x64 boot file"><input value={f.uefi_boot_file} onChange={e=>setF({...f,uefi_boot_file:e.target.value})}/></F><label className="check"><input type="checkbox" checked={f.allow_unknown} onChange={e=>setF({...f,allow_unknown:e.target.checked})}/> Allow unknown devices to reach registration</label><div></div></div></section>
+
+  <section className="pxeDesignerGrid">
+   <article className="panel">
+    <div className="sectionHead"><div><h3>Boot Menu Designer</h3><p>Customize what users see when a device PXE boots.</p></div></div>
+    <div className="formGrid formWrap">
+     <F l="Menu title" wide><input value={f.menu_title||""} onChange={e=>setF({...f,menu_title:e.target.value})}/></F>
+     <F l="Default selection"><select value={f.default_item||"deploy"} onChange={e=>setF({...f,default_item:e.target.value})}>{visible.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></F>
+     <F l="Timeout (seconds)"><input type="number" min="1" max="60" value={f.boot_menu_timeout} onChange={e=>setF({...f,boot_menu_timeout:Number(e.target.value)})}/></F>
+     <div className="wide bootOptionGrid">
+      <label><input type="checkbox" checked={Boolean(f.show_deploy)} onChange={e=>toggle("show_deploy",e.target.checked)}/><span><b>Deploy</b><small>Execute assigned image/task</small></span></label>
+      <label><input type="checkbox" checked={Boolean(f.show_register)} onChange={e=>toggle("show_register",e.target.checked)}/><span><b>Register</b><small>Enroll an unknown device</small></span></label>
+      <label><input type="checkbox" checked={Boolean(f.show_diagnostics)} onChange={e=>toggle("show_diagnostics",e.target.checked)}/><span><b>Diagnostics</b><small>Inventory and troubleshooting</small></span></label>
+      <label><input type="checkbox" checked={Boolean(f.show_local_boot)} onChange={e=>toggle("show_local_boot",e.target.checked)}/><span><b>Local Boot</b><small>Continue to installed OS</small></span></label>
+     </div>
+     <div className="wide formButtons"><button className="primary" onClick={save}>Save PXE settings</button>{saved&&<span className="savedText"><CheckCircle2 size={15}/> Saved and active</span>}</div>
+    </div>
+   </article>
+
+   <article className="panel bootPreviewPanel">
+    <div className="sectionHead"><div><h3>Live boot preview</h3><p>Preview updates before you save.</p></div><span className="previewBadge">iPXE</span></div>
+    <div className="bootScreen">
+     <div className="bootLogo">ReForge</div>
+     <div className="bootTitle">{f.menu_title||"ReForge Deployment"}</div>
+     <div className="bootMenu">{visible.length?visible.map(([id,label],i)=><div className={"bootMenuItem "+((f.default_item||"deploy")===id?"selected":"")} key={id}><span>{((f.default_item||"deploy")===id)?"›":" "}</span><b>{label}</b><small>{id==="deploy"?"Deploy the assigned ISO, gold or clone image":id==="register"?"Register this device with ReForge":id==="diagnostics"?"Run hardware inventory and diagnostics":"Boot from the local disk"}</small></div>):<div className="bootEmpty">At least one boot option is required.</div>}</div>
+     <div className="bootFooter">Automatic selection in {Number(f.boot_menu_timeout)||5}s · ↑ ↓ select · Enter continue</div>
+    </div>
+   </article>
+  </section>
+
+  <section className="panel"><h3>Boot configuration</h3><p>Point DHCP/PXE to the boot loader and chain into ReForge.</p><div className="pxeSummary"><div><span>BIOS</span><b>{f.bios_boot_file}</b></div><div><span>UEFI x64</span><b>{f.uefi_boot_file}</b></div><div><span>Next server</span><b>{f.next_server||"Set your ReForge/TFTP server"}</b></div><div><span>ReForge chain URL</span><b className="mono">{bootURL}</b></div></div><div className="codeBox">curl {bootURL}</div></section>
   <section className="panel"><h3>PXE validation checklist</h3><div className="checkList">{["DHCP reachable from deployment VLAN","BIOS and UEFI boot files available","HTTP access to ReForge web/API","Unknown-device registration policy reviewed","Imaging node attached before disk operations"].map((x,i)=><div key={x}><span>{i+1}</span><b>{x}</b></div>)}</div></section>
  </div>
 }
@@ -158,17 +207,16 @@ function ModulePage(p:{icon:any;title:string;description:string;action:string;bu
  return <div className="stack"><section className="panel moduleIntro"><div className="moduleTitle"><div className="moduleIcon"><I size={22}/></div><div><h3>{p.title}</h3><p>{p.description}</p></div></div><button className="primary" disabled title="Backend API is the next implementation phase"><Plus size={15}/>{p.action}</button></section><section className="panel emptyModule"><div className="emptyModuleIcon"><I size={28}/></div><h3>No records yet</h3><p>This v2 management surface is now in the server UI. The next implementation phase will add its database model, API and imaging-node workflow.</p><div className="featureChecks">{p.bullets.map(x=><span key={x}><CheckCircle2 size={15}/>{x}</span>)}</div></section></div>
 }
 
-function AdminCenter(){
- return <div className="adminGrid">
-  {[
-   ["Users & Roles",UserCog,"Accounts, RBAC and session management"],
-   ["Authentication",KeyRound,"Local login, AD/LDAP, Entra, MFA and passkeys"],
-   ["Imaging Nodes",Server,"Privileged capture and restore workers"],
-   ["PXE Infrastructure",Network,"Boot services, DHCP integration and network policy"],
-   ["Storage",Database,"Image repositories, capacity and replication"],
-   ["Security & Audit",ShieldCheck,"Certificates, secrets, policies and retention"]
-  ].map(([title,I,desc]:any)=><article className="panel adminTile" key={title}><I size={21}/><h3>{title}</h3><p>{desc}</p><button className="secondary" disabled>Configure</button></article>)}
- </div>
+function AdminCenter(p:{go:(page:string)=>void}){
+ const tools=[
+  ["Users & Roles",UserCog,"Accounts, password and session administration","Settings"],
+  ["Authentication",KeyRound,"Local login, AD/LDAP and directory authentication","Directory Services"],
+  ["Imaging Nodes",Server,"Privileged capture and restore workers","Imaging Nodes"],
+  ["PXE Infrastructure",Network,"Boot services, DHCP integration and boot menu designer","PXE / Network"],
+  ["Storage",Database,"Image repositories, capacity and replication","Storage Nodes"],
+  ["Security & Audit",ShieldCheck,"Security controls and administrative activity","Audit Logs"]
+ ];
+ return <div className="adminGrid">{tools.map(([title,I,desc,target]:any)=><article className="panel adminTile" key={title}><I size={21}/><h3>{title}</h3><p>{desc}</p><button className="secondary" onClick={()=>p.go(target)}>Configure</button></article>)}</div>
 }
 
 function Crud(p:any){const [show,setShow]=useState(false);return <div className="stack"><section className="panel"><div className="sectionHead"><div><h3>{p.title}</h3><p>{p.help}</p></div><div className="toolbar">{p.extra}<button className="primary" onClick={()=>setShow(!show)}><Plus size={15}/>{show?"Close":"Add new"}</button></div></div>{show&&<div className="formWrap">{p.form}</div>}</section><section className="panel">{p.children}</section></div>}
