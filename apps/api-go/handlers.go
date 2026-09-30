@@ -595,6 +595,9 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 			DHCPMode: "existing", BootMenuTimeout: 5,
 			MenuTitle: "ReForge Deployment", DefaultItem: "deploy",
 			ShowDeploy: true, ShowRegister: true, ShowDiagnostics: true, ShowLocalBoot: true,
+			BrandName: "ReForge", MenuSubtitle: "Secure endpoint deployment",
+			SupportText: "Contact IT support for assistance", AccentColor: "#1473e6",
+			ShowLogo: true, ShowBackground: true, RequireLogin: true,
 		}
 		a.db.Create(&row)
 	} else if strings.TrimSpace(row.MenuTitle) == "" {
@@ -605,6 +608,13 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 		row.ShowRegister = true
 		row.ShowDiagnostics = true
 		row.ShowLocalBoot = true
+		row.BrandName = "ReForge"
+		row.MenuSubtitle = "Secure endpoint deployment"
+		row.SupportText = "Contact IT support for assistance"
+		row.AccentColor = "#1473e6"
+		row.ShowLogo = true
+		row.ShowBackground = true
+		row.RequireLogin = true
 		a.db.Save(&row)
 	}
 	writeJSON(w, 200, row)
@@ -619,6 +629,8 @@ func (a *App) savePXE(w http.ResponseWriter, r *http.Request) {
 	row.ID = "default"
 	if row.BootMenuTimeout < 1 { row.BootMenuTimeout = 5 }
 	if strings.TrimSpace(row.MenuTitle) == "" { row.MenuTitle = "ReForge Deployment" }
+	if strings.TrimSpace(row.BrandName) == "" { row.BrandName = "ReForge" }
+	if strings.TrimSpace(row.AccentColor) == "" { row.AccentColor = "#1473e6" }
 	switch row.DefaultItem {
 	case "deploy", "register", "diagnostics", "local":
 	default:
@@ -648,6 +660,25 @@ func firstPXEMenuItem(p PXEConfig) string {
 	return "local"
 }
 
+func firstPXEMenuItem(p PXEConfig) string {
+	if p.ShowDeploy { return "deploy" }
+	if p.ShowRegister { return "register" }
+	if p.ShowDiagnostics { return "diagnostics" }
+	if p.ShowLocalBoot { return "local" }
+	return "local"
+}
+
+func pxeAuthCatalogURL(base string) string {
+	base = strings.TrimRight(base, "/")
+	if strings.HasPrefix(base, "https://") {
+		return "https://${username:uristring}:${password:uristring}@" + strings.TrimPrefix(base, "https://") + "/boot/catalog.ipxe"
+	}
+	if strings.HasPrefix(base, "http://") {
+		return "http://${username:uristring}:${password:uristring}@" + strings.TrimPrefix(base, "http://") + "/boot/catalog.ipxe"
+	}
+	return "http://${username:uristring}:${password:uristring}@" + base + "/boot/catalog.ipxe"
+}
+
 func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 	var p PXEConfig
 	if a.db.First(&p, "id = ?", "default").Error != nil || !p.Enabled {
@@ -658,6 +689,7 @@ func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.TrimSpace(p.MenuTitle) == "" { p.MenuTitle = "ReForge Deployment" }
+	if strings.TrimSpace(p.BrandName) == "" { p.BrandName = "ReForge" }
 	if p.DefaultItem == "" { p.DefaultItem = firstPXEMenuItem(p) }
 	timeout := p.BootMenuTimeout * 1000
 	apiVar := "$" + "{reforge-api}"
@@ -666,15 +698,31 @@ func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintln(w, "#!ipxe")
 	fmt.Fprintln(w, "set reforge-api "+p.ServerURL)
+	if p.ShowBackground {
+		fmt.Fprintln(w, "console --picture "+p.ServerURL+"/boot/assets/background ||")
+	}
+	fmt.Fprintln(w, "echo "+p.BrandName)
+	if strings.TrimSpace(p.MenuSubtitle)!="" { fmt.Fprintln(w, "echo "+p.MenuSubtitle) }
 	fmt.Fprintln(w, "menu "+p.MenuTitle)
-	if p.ShowDeploy { fmt.Fprintln(w, "item deploy Deploy assigned image") }
+	if p.ShowDeploy {
+		if p.RequireLogin { fmt.Fprintln(w, "item deploy Install / Capture (Sign in)") } else { fmt.Fprintln(w, "item deploy Deployment portal") }
+	}
 	if p.ShowRegister { fmt.Fprintln(w, "item register Register this device") }
 	if p.ShowDiagnostics { fmt.Fprintln(w, "item diagnostics Diagnostics and inventory") }
 	if p.ShowLocalBoot { fmt.Fprintln(w, "item local Boot local disk") }
 	fmt.Fprintf(w, "choose --default %s --timeout %d target && goto %s\n", p.DefaultItem, timeout, targetVar)
 	if p.ShowDeploy {
 		fmt.Fprintln(w, ":deploy")
-		fmt.Fprintln(w, "chain "+apiVar+"/boot/deploy.ipxe?mac="+macVar+" || goto local")
+		if p.RequireLogin {
+			fmt.Fprintln(w, "login")
+			fmt.Fprintln(w, "chain "+pxeAuthCatalogURL(p.ServerURL)+"?mac="+macVar+" || goto failedlogin")
+			fmt.Fprintln(w, ":failedlogin")
+			fmt.Fprintln(w, "echo Authentication failed or access denied")
+			fmt.Fprintln(w, "sleep 2")
+			fmt.Fprintln(w, "goto local")
+		} else {
+			fmt.Fprintln(w, "chain "+apiVar+"/boot/catalog.ipxe?mac="+macVar+" || goto local")
+		}
 	}
 	if p.ShowRegister {
 		fmt.Fprintln(w, ":register")
@@ -688,6 +736,7 @@ func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "goto local")
 	}
 	fmt.Fprintln(w, ":local")
+	if strings.TrimSpace(p.SupportText)!="" { fmt.Fprintln(w, "echo "+p.SupportText) }
 	fmt.Fprintln(w, "exit")
 }
 
