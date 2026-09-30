@@ -138,19 +138,21 @@ func (a *App) deleteGroup(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) listISOs(w http.ResponseWriter,r *http.Request){var rows []ISOImage;a.db.Order("created_at desc").Find(&rows);writeJSON(w,200,rows)}
 func (a *App) saveISO(w http.ResponseWriter,r *http.Request){
+	if !a.requireAdminPermission(w,r,"admin.pxe"){return}
 	var row ISOImage;if decodeJSON(r,&row)!=nil||strings.TrimSpace(row.Name)==""{writeJSON(w,400,map[string]string{"detail":"name is required"});return}
 	if id:=chi.URLParam(r,"id");id!=""{row.ID=id}else{row.ID=uuid.NewString();row.CreatedAt=time.Now().UTC()}
 	if row.Architecture==""{row.Architecture="x86_64"};if a.db.Save(&row).Error!=nil{writeJSON(w,409,map[string]string{"detail":"ISO could not be saved"});return};a.audit(r,"save","iso",row.ID,true,"");writeJSON(w,200,row)
 }
-func (a *App) deleteISO(w http.ResponseWriter,r *http.Request){id:=chi.URLParam(r,"id");err:=a.db.Delete(&ISOImage{},"id = ?",id).Error;a.audit(r,"delete","iso",id,err==nil,"");if err!=nil{writeJSON(w,400,map[string]string{"detail":"delete failed"});return};w.WriteHeader(204)}
+func (a *App) deleteISO(w http.ResponseWriter,r *http.Request){if !a.requireAdminPermission(w,r,"admin.pxe"){return};id:=chi.URLParam(r,"id");err:=a.db.Delete(&ISOImage{},"id = ?",id).Error;a.audit(r,"delete","iso",id,err==nil,"");if err!=nil{writeJSON(w,400,map[string]string{"detail":"delete failed"});return};w.WriteHeader(204)}
 
 func (a *App) listClones(w http.ResponseWriter,r *http.Request){var rows []CloneImage;a.db.Order("created_at desc").Find(&rows);writeJSON(w,200,rows)}
 func (a *App) saveClone(w http.ResponseWriter,r *http.Request){
+	if !a.requireAdminPermission(w,r,"admin.pxe"){return}
 	var row CloneImage;if decodeJSON(r,&row)!=nil||strings.TrimSpace(row.Name)==""{writeJSON(w,400,map[string]string{"detail":"name is required"});return}
 	if id:=chi.URLParam(r,"id");id!=""{row.ID=id}else{row.ID=uuid.NewString();row.CreatedAt=time.Now().UTC()}
 	if a.db.Save(&row).Error!=nil{writeJSON(w,409,map[string]string{"detail":"clone image could not be saved"});return};a.audit(r,"save","clone-image",row.ID,true,"");writeJSON(w,200,row)
 }
-func (a *App) deleteClone(w http.ResponseWriter,r *http.Request){id:=chi.URLParam(r,"id");err:=a.db.Delete(&CloneImage{},"id = ?",id).Error;a.audit(r,"delete","clone-image",id,err==nil,"");if err!=nil{writeJSON(w,400,map[string]string{"detail":"delete failed"});return};w.WriteHeader(204)}
+func (a *App) deleteClone(w http.ResponseWriter,r *http.Request){if !a.requireAdminPermission(w,r,"admin.pxe"){return};id:=chi.URLParam(r,"id");err:=a.db.Delete(&CloneImage{},"id = ?",id).Error;a.audit(r,"delete","clone-image",id,err==nil,"");if err!=nil{writeJSON(w,400,map[string]string{"detail":"delete failed"});return};w.WriteHeader(204)}
 
 func (a *App) uploadBrandingAsset(w http.ResponseWriter,r *http.Request){
 	if !a.requireAdminPermission(w,r,"admin.branding"){return}
