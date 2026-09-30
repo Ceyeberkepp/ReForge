@@ -2,6 +2,7 @@ FROM golang:1.27.1-bookworm AS build
 WORKDIR /src
 COPY go.mod ./
 COPY . .
+RUN go mod tidy && go mod verify
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/reforge-worker .
 
 FROM gcr.io/distroless/static-debian12:nonroot
