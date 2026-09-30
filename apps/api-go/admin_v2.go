@@ -178,7 +178,12 @@ func (a *App) basicPXEUser(r *http.Request) *User {
 }
 
 func (a *App) pxeCatalog(w http.ResponseWriter,r *http.Request){
-	u:=a.pxeUserFromToken(r);if u==nil||!a.hasPermission(u,"pxe.login"){w.WriteHeader(401);return}
+	u:=a.basicPXEUser(r)
+	if u==nil||!a.hasPermission(u,"pxe.login"){
+		w.Header().Set("WWW-Authenticate",`Basic realm="ReForge PXE"`)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	token:=a.newPXEAccessToken(u)
 	perms:=a.userPermissions(u)
 	w.Header().Set("Content-Type","text/plain")
@@ -196,54 +201,104 @@ func (a *App) pxeCatalog(w http.ResponseWriter,r *http.Request){
 	if perms["pxe.diagnostics"] { fmt.Fprintln(w,"item diagnostics Diagnostics") }
 	fmt.Fprintln(w,"item local Boot local disk")
 	fmt.Fprintln(w,"choose action && goto ${action}")
-	for _,item:=range []struct{id,typ,act,perm string}{
-		{"install-iso","iso","install","pxe.iso"},{"install-gold","gold","install","pxe.gold"},{"install-clone","clone","install","pxe.clone"},
-	}{
-		if perms["pxe.install"]&&perms[item.perm] {
-			fmt.Fprintln(w,":"+item.id)
-			fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),item.typ)
-		}
+	if perms["pxe.install"]&&perms["pxe.iso"] {
+		fmt.Fprintln(w,":install-iso")
+		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=iso&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
 	}
-	if perms["pxe.capture"]&&perms["pxe.gold"] {fmt.Fprintln(w,":capture-gold");fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=gold&mac=${net0/mac} || goto local\n",a.pxeServerURL())}
-	if perms["pxe.capture"]&&perms["pxe.clone"] {fmt.Fprintln(w,":capture-clone");fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=clone&mac=${net0/mac} || goto local\n",a.pxeServerURL())}
-	fmt.Fprintln(w,":diagnostics");fmt.Fprintln(w,"echo ReForge diagnostics");fmt.Fprintln(w,"sleep 2");fmt.Fprintln(w,"goto local")
-	fmt.Fprintln(w,":local");fmt.Fprintln(w,"exit")
+	if perms["pxe.install"]&&perms["pxe.gold"] {
+		fmt.Fprintln(w,":install-gold")
+		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=gold&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+	}
+	if perms["pxe.install"]&&perms["pxe.clone"] {
+		fmt.Fprintln(w,":install-clone")
+		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=clone&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+	}
+	if perms["pxe.capture"]&&perms["pxe.gold"] {
+		fmt.Fprintln(w,":capture-gold")
+		fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=gold&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+	}
+	if perms["pxe.capture"]&&perms["pxe.clone"] {
+		fmt.Fprintln(w,":capture-clone")
+		fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=clone&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+	}
+	if perms["pxe.diagnostics"] {
+		fmt.Fprintln(w,":diagnostics")
+		fmt.Fprintln(w,"echo ReForge diagnostics")
+		fmt.Fprintln(w,"sleep 2")
+		fmt.Fprintln(w,"goto local")
+	}
+	fmt.Fprintln(w,":local")
+	fmt.Fprintln(w,"exit")
 }
 
 func (a *App) pxeServerURL() string {
-	var p PXEConfig;if a.db.First(&p,"id = ?","default").Error==nil&&strings.TrimSpace(p.ServerURL)!=""{return strings.TrimRight(p.ServerURL,"/")}
+	var p PXEConfig
+	if a.db.First(&p,"id = ?","default").Error==nil&&strings.TrimSpace(p.ServerURL)!="" {
+		return strings.TrimRight(p.ServerURL,"/")
+	}
 	return "http://reforge.local:5173"
 }
 
 func (a *App) pxeSources(w http.ResponseWriter,r *http.Request){
-	u:=a.basicPXEUser(r);if u==nil||!a.hasPermission(u,"pxe.login"){w.Header().Set("WWW-Authenticate",`Basic realm="ReForge PXE"`);w.WriteHeader(401);return}
-	typ:=r.URL.Query().Get("type");needed:="pxe."+typ
-	if !a.hasPermission(u,"pxe.install")||!a.hasPermission(u,needed){w.WriteHeader(403);return}
-	w.Header().Set("Content-Type","text/plain");fmt.Fprintln(w,"#!ipxe");fmt.Fprintf(w,"menu Select %s source\n",strings.ToUpper(typ))
+	u:=a.pxeUserFromToken(r)
+	if u==nil||!a.hasPermission(u,"pxe.login"){w.WriteHeader(http.StatusUnauthorized);return}
+	token:=r.URL.Query().Get("token")
+	typ:=r.URL.Query().Get("type")
+	needed:="pxe."+typ
+	if !a.hasPermission(u,"pxe.install")||!a.hasPermission(u,needed){w.WriteHeader(http.StatusForbidden);return}
+	w.Header().Set("Content-Type","text/plain")
+	fmt.Fprintln(w,"#!ipxe")
+	fmt.Fprintf(w,"menu Select %s source\n",strings.ToUpper(typ))
+	count:=0
 	switch typ{
 	case "iso":
-		var rows []ISOImage;a.db.Where("enabled = ?",true).Order("name").Find(&rows);for _,x:=range rows{fmt.Fprintf(w,"item %s %s %s\n",x.ID,x.Name,x.Version)}
+		var rows []ISOImage
+		a.db.Where("enabled = ?",true).Order("name").Find(&rows)
+		for _,x:=range rows{fmt.Fprintf(w,"item %s %s %s\n",x.ID,x.Name,x.Version);count++}
 	case "gold":
-		var rows []GoldImage;a.db.Order("name").Find(&rows);for _,x:=range rows{fmt.Fprintf(w,"item %s %s v%s\n",x.ID,x.Name,x.ImageVersion)}
+		var rows []GoldImage
+		a.db.Order("name").Find(&rows)
+		for _,x:=range rows{fmt.Fprintf(w,"item %s %s v%s\n",x.ID,x.Name,x.ImageVersion);count++}
 	case "clone":
-		var rows []CloneImage;a.db.Where("enabled = ?",true).Order("name").Find(&rows);for _,x:=range rows{fmt.Fprintf(w,"item %s %s\n",x.ID,x.Name)}
-	default:w.WriteHeader(400);return
+		var rows []CloneImage
+		a.db.Where("enabled = ?",true).Order("name").Find(&rows)
+		for _,x:=range rows{fmt.Fprintf(w,"item %s %s\n",x.ID,x.Name);count++}
+	default:
+		w.WriteHeader(http.StatusBadRequest);return
 	}
-	fmt.Fprintln(w,"item cancel Cancel");fmt.Fprintln(w,"choose source && goto selected");fmt.Fprintln(w,":selected")
-	fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=install&type=%s&source=${source}&mac=${net0/mac} || exit\n",a.pxeServerURL(),typ)
+	if count==0 {
+		fmt.Fprintln(w,"item none No deployment sources available")
+	}
+	fmt.Fprintln(w,"item cancel Cancel")
+	fmt.Fprintln(w,"choose source && goto selected")
+	fmt.Fprintln(w,":selected")
+	fmt.Fprintln(w,"iseq ${source} cancel && exit ||")
+	fmt.Fprintln(w,"iseq ${source} none && exit ||")
+	fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=install&type=%s&source=${source}&token=%s&mac=${net0/mac} || exit\n",a.pxeServerURL(),typ,token)
 }
 
 func (a *App) pxeAction(w http.ResponseWriter,r *http.Request){
-	u:=a.basicPXEUser(r);if u==nil||!a.hasPermission(u,"pxe.login"){w.Header().Set("WWW-Authenticate",`Basic realm="ReForge PXE"`);w.WriteHeader(401);return}
-	action:=r.URL.Query().Get("action");typ:=r.URL.Query().Get("type");source:=r.URL.Query().Get("source")
-	if action=="install"&&!a.hasPermission(u,"pxe.install"){w.WriteHeader(403);return}
-	if action=="capture"&&!a.hasPermission(u,"pxe.capture"){w.WriteHeader(403);return}
-	if !a.hasPermission(u,"pxe."+typ){w.WriteHeader(403);return}
-	mac,_:=normalizeMAC(r.URL.Query().Get("mac"))
+	u:=a.pxeUserFromToken(r)
+	if u==nil||!a.hasPermission(u,"pxe.login"){w.WriteHeader(http.StatusUnauthorized);return}
+	action:=r.URL.Query().Get("action")
+	typ:=r.URL.Query().Get("type")
+	source:=r.URL.Query().Get("source")
+	if action=="install"&&!a.hasPermission(u,"pxe.install"){w.WriteHeader(http.StatusForbidden);return}
+	if action=="capture"&&!a.hasPermission(u,"pxe.capture"){w.WriteHeader(http.StatusForbidden);return}
+	if !a.hasPermission(u,"pxe."+typ){w.WriteHeader(http.StatusForbidden);return}
+	mac,err:=normalizeMAC(r.URL.Query().Get("mac"))
+	if err!=nil{w.WriteHeader(http.StatusBadRequest);return}
 	task:=PXETask{ID:uuid.NewString(),HostMAC:mac,Action:action,SourceType:typ,SourceID:source,RequestedBy:u.Username,Status:"queued",CreatedAt:time.Now().UTC()}
-	if a.db.Create(&task).Error!=nil{w.WriteHeader(500);return}
+	if a.db.Create(&task).Error!=nil{w.WriteHeader(http.StatusInternalServerError);return}
 	a.audit(r,"queue-"+action,"pxe-task",task.ID,true,typ)
-	w.Header().Set("Content-Type","text/plain");fmt.Fprintln(w,"#!ipxe");fmt.Fprintln(w,"echo ReForge task queued");fmt.Fprintln(w,"echo Task: "+task.ID);fmt.Fprintln(w,"echo Imaging node handoff required");fmt.Fprintln(w,"sleep 3");fmt.Fprintln(w,"exit")
+	w.Header().Set("Content-Type","text/plain")
+	fmt.Fprintln(w,"#!ipxe")
+	fmt.Fprintln(w,"echo ReForge task queued")
+	fmt.Fprintln(w,"echo Task: "+task.ID)
+	fmt.Fprintln(w,"echo Requested by: "+u.Username)
+	fmt.Fprintln(w,"echo Imaging node handoff required")
+	fmt.Fprintln(w,"sleep 3")
+	fmt.Fprintln(w,"exit")
 }
 
 func decodeJSON(r *http.Request,v any) error {
@@ -257,7 +312,8 @@ func (a *App) newPXEAccessToken(u *User) string {
 }
 
 func (a *App) pxeUserFromToken(r *http.Request) *User {
-	token:=strings.TrimSpace(r.URL.Query().Get("token")); if token=="" { return nil }
+	token:=strings.TrimSpace(r.URL.Query().Get("token"))
+	if token=="" { return nil }
 	var t PXEAccessToken
 	if a.db.First(&t,"token = ? AND expires_at > ?",token,time.Now().UTC()).Error!=nil { return nil }
 	var u User
