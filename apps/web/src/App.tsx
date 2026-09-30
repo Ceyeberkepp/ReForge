@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Boxes, Building2, Computer, HardDrive, LayoutDashboard, Package, Rocket, Settings, ShieldCheck, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle, Loader2, Network, Database, ClipboardList, KeyRound } from "lucide-react";
+import { Boxes, Building2, Computer, HardDrive, LayoutDashboard, Package, Rocket, Settings, ShieldCheck, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle, Loader2, Network, Database, ClipboardList, KeyRound, Search, Bell, HelpCircle, Sun, Moon, Monitor, Disc3, Copy, ListChecks, Wrench, BarChart3, UserCog, Apple, LogOut, Activity, Server } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 type Stats={images:number;departments:number;software:number;hosts:number;queued_deployments:number;running_deployments?:number};
@@ -10,7 +10,14 @@ type Host={id:string;hostname:string;mac_address:string;serial_number:string;man
 type Job={id:string;host_id:string;image_id:string;department_id?:string|null;optional_software:string[];status:string;progress:number;current_step:string;created_at:string};
 type Dir={id?:string;domain:string;domain_controller:string;protocol:string;port:number;base_dn:string;service_account:string;default_computer_ou:string};
 
-const nav=[["Dashboard",LayoutDashboard],["Gold Images",HardDrive],["Departments",Building2],["Software",Package],["Hosts",Computer],["Deployments",Rocket],["Directory Services",ShieldCheck],["PXE / Network",Network],["Audit",ClipboardList],["Settings",Settings]] as const;
+const navGroups=[
+  {label:"",items:[["Dashboard",LayoutDashboard]]},
+  {label:"Images",items:[["Gold Images",HardDrive],["ISO Library",Disc3],["Clone Images",Copy],["macOS Installers",Apple]]},
+  {label:"Deployment",items:[["Hosts (PXE)",Computer],["Deployments",Rocket],["Task Sequences",ListChecks],["Departments",Building2]]},
+  {label:"Management",items:[["Applications",Package],["Drivers",Wrench],["Directory Services",ShieldCheck],["PXE / Network",Network]]},
+  {label:"Monitoring",items:[["Audit Logs",ClipboardList],["Reports",BarChart3]]},
+  {label:"System",items:[["Admin Center",UserCog],["Settings",Settings]]}
+] as const;
 async function req(path:string,init?:RequestInit){const r=await fetch(API+path,{...init,credentials:"include",headers:{"Content-Type":"application/json",...(init?.headers||{})}});if(!r.ok){let m=r.status+" "+r.statusText;try{const b=await r.json();m=b.detail||b.message||m}catch{}throw new Error(m)}return r.status===204?null:r.json()}
 const img0={name:"",os_name:"Windows 11 Enterprise",os_version:"",architecture:"x86_64",image_version:"1.0",image_path:"",sysprep_ready:false,checksum:"",notes:""};
 const sw0={name:"",version:"",installer_path:"",silent_install:"",detection_rule:"",uninstall_command:"",install_order:100,required_by_default:false};
@@ -20,26 +27,65 @@ const dir0:Dir={domain:"",domain_controller:"",protocol:"ldaps",port:636,base_dn
 
 export function App(){
  const [auth,setAuth]=useState<null|boolean>(null),[active,setActive]=useState("Dashboard"),[stats,setStats]=useState<Stats>({images:0,departments:0,software:0,hosts:0,queued_deployments:0}),[images,setImages]=useState<Img[]>([]),[software,setSoftware]=useState<Sw[]>([]),[departments,setDepartments]=useState<Dept[]>([]),[hosts,setHosts]=useState<Host[]>([]),[jobs,setJobs]=useState<Job[]>([]),[directory,setDirectory]=useState<Dir>(dir0),[error,setError]=useState(""),[notice,setNotice]=useState(""),[loading,setLoading]=useState(true);
+ const [theme,setTheme]=useState<"light"|"dark"|"system">(()=>((localStorage.getItem("reforge-theme") as any)||"system"));
  async function refresh(silent=false){if(!silent)setLoading(true);try{const a=await Promise.all([req("/api/dashboard"),req("/api/images"),req("/api/software"),req("/api/departments"),req("/api/hosts"),req("/api/deployments"),req("/api/directory")]);setStats(a[0]);setImages(a[1]);setSoftware(a[2]);setDepartments(a[3]);setHosts(a[4]);setJobs(a[5]);setDirectory(a[6]);setError("")}catch(e:any){setError(e.message)}finally{if(!silent)setLoading(false)}}
  useEffect(()=>{req("/api/auth/me").then(()=>{setAuth(true);refresh()}).catch(()=>setAuth(false))},[]);
  useEffect(()=>{if(!auth)return;const t=setInterval(()=>refresh(true),4000);return()=>clearInterval(t)},[auth]);
+ useEffect(()=>{localStorage.setItem("reforge-theme",theme);document.documentElement.dataset.theme=theme},[theme]);
  let page:any=<Dashboard stats={stats} jobs={jobs} hosts={hosts} images={images}/>;
  if(active==="Gold Images")page=<Images items={images} changed={refresh} err={setError} note={setNotice}/>;
- if(active==="Software")page=<Software items={software} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Applications")page=<Software items={software} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Departments")page=<Departments items={departments} images={images} software={software} changed={refresh} err={setError} note={setNotice}/>;
- if(active==="Hosts")page=<Hosts items={hosts} departments={departments} changed={refresh} err={setError} note={setNotice}/>;
+ if(active==="Hosts (PXE)")page=<Hosts items={hosts} departments={departments} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Deployments")page=<Deployments items={jobs} hosts={hosts} images={images} departments={departments} software={software} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Directory Services")page=<Directory value={directory} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="PXE / Network")page=<PXE/>;
- if(active==="Audit")page=<AuditPage/>;
+ if(active==="Audit Logs")page=<AuditPage/>;
  if(active==="Settings")page=<SettingsPage/>;
+ if(active==="ISO Library")page=<ModulePage icon={Disc3} title="ISO Library" description="Import and manage Windows, Linux and recovery installation media for PXE deployment." action="Import ISO" bullets={["Checksum and architecture metadata","UEFI/BIOS compatibility","Unattended install configuration"]}/>;
+ if(active==="Clone Images")page=<ModulePage icon={Copy} title="Clone Images" description="Capture machine-oriented disk images for labs, kiosks and identical hardware fleets." action="Capture clone" bullets={["Disk and partition topology","Hardware-family matching","Restore validation"]}/>;
+ if(active==="macOS Installers")page=<ModulePage icon={Apple} title="macOS Provisioning" description="Manage macOS installers, packages, profiles and supported Apple provisioning workflows." action="Add installer" bullets={["Intel and Apple Silicon inventory","PKG and configuration profiles","Apple enrollment integration"]}/>;
+ if(active==="Task Sequences")page=<ModulePage icon={ListChecks} title="Task Sequences" description="Build ordered deployment workflows for imaging, drivers, applications, directory join, updates and validation." action="New task sequence" bullets={["Conditional deployment steps","Retries and timeouts","Windows, Linux and macOS filters"]}/>;
+ if(active==="Drivers")page=<ModulePage icon={Wrench} title="Driver Packs" description="Organize driver packs by manufacturer, model, operating system and architecture." action="Add driver pack" bullets={["Model matching","Offline Windows injection","Versioned driver packs"]}/>;
+ if(active==="Reports")page=<ModulePage icon={BarChart3} title="Reports" description="Deployment, image, host, driver and imaging-node operational reporting." action="Create report" bullets={["Deployment success and duration","Image usage and age","Hardware and OS inventory"]}/>;
+ if(active==="Admin Center")page=<AdminCenter/>;
  if(auth===null)return <div className="loadingScreen"><Loader2 className="spin"/> Starting ReForge...</div>;
  if(!auth)return <Login onSuccess={()=>{setAuth(true);refresh()}}/>;
  async function logout(){try{await req("/api/auth/logout",{method:"POST"})}finally{setAuth(false)}}
- return <div className="shell"><aside><div className="brand"><div className="brandmark"><Boxes size={21}/></div><div><strong>ReForge</strong><span>Deployment Platform</span></div></div><nav>{nav.map(([l,I])=><button key={l} className={active===l?"active":""} onClick={()=>setActive(l)}><I size={18}/><span>{l}</span></button>)}</nav><div className="version"><button className="logoutBtn" onClick={logout}>Sign out</button><span>ReForge v0.3.0</span></div></aside><main><header><div><span className="eyebrow">CONTROL PLANE</span><h1>{active}</h1></div><button className="secondary" onClick={()=>refresh()}><RefreshCw size={15}/> Refresh</button></header>{error&&<Alert kind="error" text={error} close={()=>setError("")}/>} {notice&&<Alert kind="success" text={notice} close={()=>setNotice("")}/>} {loading?<div className="loading"><Loader2 className="spin"/> Loading ReForge...</div>:page}</main></div>
+ return <div className="shell">
+  <aside>
+   <div className="brand"><div className="brandmark"><Boxes size={22}/></div><div><strong>ReForge</strong><span>Deployment Platform</span></div></div>
+   <nav>{navGroups.map(group=><div className="navGroup" key={group.label||"main"}>{group.label&&<div className="navLabel">{group.label}</div>}{group.items.map(([l,I])=><button key={l} className={active===l?"active":""} onClick={()=>setActive(l)}><I size={18}/><span>{l}</span></button>)}</div>)}</nav>
+   <div className="accountCard"><div className="avatar">A</div><div><b>Administrator</b><span>Local admin</span></div><button onClick={logout} title="Sign out"><LogOut size={16}/></button></div>
+  </aside>
+  <div className="workspace">
+   <div className="topbar">
+    <div className="globalSearch"><Search size={17}/><input aria-label="Global search" placeholder="Search images, devices, deployments..."/><kbd>Ctrl K</kbd></div>
+    <div className="topActions">
+     <div className="themeSwitch"><button className={theme==="light"?"active":""} onClick={()=>setTheme("light")}><Sun size={15}/> Light</button><button className={theme==="dark"?"active":""} onClick={()=>setTheme("dark")}><Moon size={15}/> Dark</button><button className={theme==="system"?"active":""} onClick={()=>setTheme("system")}><Monitor size={15}/> System</button></div>
+     <button className="topIcon" title="Notifications"><Bell size={18}/></button><button className="topIcon" title="Help"><HelpCircle size={18}/></button>
+    </div>
+   </div>
+   <main>
+    <header className="pageHeader"><div><h1>{active}</h1><p>{active==="Dashboard"?"Manage and deploy systems across your environment.":"ReForge deployment management"}</p></div><button className="secondary" onClick={()=>refresh()}><RefreshCw size={15}/> Refresh</button></header>
+    {error&&<Alert kind="error" text={error} close={()=>setError("")}/>} {notice&&<Alert kind="success" text={notice} close={()=>setNotice("")}/>}
+    {loading?<div className="loading"><Loader2 className="spin"/> Loading ReForge...</div>:page}
+   </main>
+  </div>
+ </div>
 }
 
-function Dashboard(p:{stats:Stats;jobs:Job[];hosts:Host[];images:Img[]}){const c=[["Gold Images",p.stats.images],["Departments",p.stats.departments],["Software Packages",p.stats.software],["Managed Hosts",p.stats.hosts]];return <><section className="hero"><div><span className="statusDot"/>SYSTEM READY</div><h2>Build once. Deploy everywhere.</h2><p>Gold images, department profiles, application packages, PXE hosts and directory integration in one deployment control plane.</p></section><section className="stats">{c.map(x=><article key={String(x[0])}><span>{x[0]}</span><strong>{x[1]}</strong><small>Managed by ReForge</small></article>)}</section><section className="grid"><article className="panel"><h3>Deployment Pipeline</h3><div className="pipeline">{["PXE Boot","Gold Image","Drivers","Department","Applications","Join AD","Updates","Complete"].map((x,i)=><div className="step" key={x}><b>{String(i+1).padStart(2,"0")}</b><span>{x}</span></div>)}</div></article><article className="panel queue"><h3>Live Queue</h3><div className="queueNumber">{p.stats.queued_deployments}</div><p>{p.stats.running_deployments||0} running</p></article></section><section className="panel sectionGap"><h3>Recent Deployments</h3><table><thead><tr><th>Host</th><th>Image</th><th>Status</th><th>Progress</th><th>Step</th></tr></thead><tbody>{p.jobs.slice(0,5).map(j=><tr key={j.id}><td>{p.hosts.find(h=>h.id===j.host_id)?.hostname||j.host_id.slice(0,8)}</td><td>{p.images.find(i=>i.id===j.image_id)?.name||"Unknown"}</td><td><Status v={j.status}/></td><td><Progress v={j.progress}/></td><td>{j.current_step}</td></tr>)}{!p.jobs.length&&<Empty cols={5}/>}</tbody></table></section></>}
+function Dashboard(p:{stats:Stats;jobs:Job[];hosts:Host[];images:Img[]}){
+ const recent=p.jobs.slice(0,5);
+ return <div className="dashboardV2">
+  <section className="systemStrip"><div className="serverIdentity"><div className="serverIcon"><Server size={21}/></div><div><b>ReForge Server</b><span>Deployment control plane</span></div></div><div className="systemReady"><span className="statusDot"/><div><b>System Ready</b><span>API and database available</span></div></div></section>
+  <section className="panel pipelinePanel"><div className="sectionHead"><div><h3>Deployment Pipeline</h3><p>Step-by-step workflow for deploying systems.</p></div><button className="primary"><Play size={16}/> Start Deployment</button></div><div className="pipelineFlow">{["PXE Boot","Select Source","Drivers","Join Directory","Applications","Complete"].map((x,i)=><div className="pipeStage" key={x}><div className={i<2?"pipeDot done":"pipeDot"}>{i<2?<CheckCircle2 size={18}/>:i+1}</div><b>{x}</b><span>{["Boot device from network","ISO, gold or clone image","Inject matching drivers","AD / Entra placement","Install software and updates","Validate and hand off"][i]}</span></div>)}</div></section>
+  <section className="dashboardGrid">
+   <article className="panel"><div className="sectionHead"><div><h3>Live Queue</h3><p>Active and recent deployments.</p></div><span className="linkText">{p.stats.queued_deployments} queued · {p.stats.running_deployments||0} running</span></div><table><thead><tr><th>Device</th><th>Image</th><th>Stage</th><th>Progress</th></tr></thead><tbody>{recent.map(j=><tr key={j.id}><td><b>{p.hosts.find(h=>h.id===j.host_id)?.hostname||j.host_id.slice(0,8)}</b></td><td>{p.images.find(i=>i.id===j.image_id)?.name||"Unassigned"}</td><td><Status v={j.status}/></td><td><Progress v={j.progress}/></td></tr>)}{!recent.length&&<Empty cols={4}/>}</tbody></table></article>
+   <article className="panel activityPanel"><div className="sectionHead"><div><h3>Environment</h3><p>Managed resources.</p></div></div><div className="metricRows"><div><HardDrive size={18}/><span>Gold Images</span><b>{p.stats.images}</b></div><div><Computer size={18}/><span>Managed Hosts</span><b>{p.stats.hosts}</b></div><div><Building2 size={18}/><span>Departments</span><b>{p.stats.departments}</b></div><div><Package size={18}/><span>Applications</span><b>{p.stats.software}</b></div></div></article>
+  </section>
+ </div>
+}
 
 function Images(p:any){const [f,setF]=useState<any>(img0),[edit,setEdit]=useState<string|null>(null);async function save(e:FormEvent){e.preventDefault();try{await req(edit?"/api/images/"+edit:"/api/images",{method:edit?"PUT":"POST",body:JSON.stringify(f)});setF(img0);setEdit(null);p.note("Gold image saved");p.changed()}catch(e:any){p.err(e.message)}}async function del(id:string){if(confirm("Delete this gold image?"))try{await req("/api/images/"+id,{method:"DELETE"});p.changed()}catch(e:any){p.err(e.message)}}return <Crud title="Gold Images" help="Maintain generalized, versioned Windows or Linux source images." form={<form onSubmit={save} className="formGrid"><F l="Image name"><input required value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></F><F l="Operating system"><input value={f.os_name} onChange={e=>setF({...f,os_name:e.target.value})}/></F><F l="OS version/build"><input value={f.os_version} onChange={e=>setF({...f,os_version:e.target.value})}/></F><F l="Image version"><input value={f.image_version} onChange={e=>setF({...f,image_version:e.target.value})}/></F><F l="Storage path"><input value={f.image_path||""} onChange={e=>setF({...f,image_path:e.target.value})}/></F><label className="check"><input type="checkbox" checked={f.sysprep_ready} onChange={e=>setF({...f,sysprep_ready:e.target.checked})}/> Sysprep / generalized</label><Save editing={!!edit} cancel={()=>{setEdit(null);setF(img0)}}/></form>}><Cards>{p.items.map((x:Img)=><Card key={x.id} title={x.name} sub={x.os_name+" "+x.os_version+" • v"+x.image_version}><div className="meta"><span>{x.architecture}</span><span>{x.sysprep_ready?"Sysprep ready":"Not generalized"}</span></div><p>{x.image_path||"No storage path"}</p><Actions edit={()=>{setEdit(x.id);setF({...x})}} del={()=>del(x.id)}/></Card>)}</Cards></Crud>}
 
@@ -107,6 +153,24 @@ function AuditPage(){
  return <section className="panel"><div className="sectionHead"><div><h3>Audit log</h3><p>Administrative security and configuration activity recorded by ReForge.</p></div></div>{error&&<div className="alert error">{error}</div>}<table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>Source</th><th>Result</th></tr></thead><tbody>{rows.map(x=><tr key={x.id}><td>{new Date(x.at).toLocaleString()}</td><td><b>{x.actor}</b></td><td>{x.action}</td><td>{x.resource}{x.resource_id?" / "+x.resource_id.slice(0,8):""}</td><td className="mono">{x.remote_ip}</td><td><span className={"status "+(x.success?"succeeded":"failed")}>{x.success?"Success":"Failed"}</span></td></tr>)}{!rows.length&&<Empty cols={6}/>}</tbody></table></section>
 }
 
+function ModulePage(p:{icon:any;title:string;description:string;action:string;bullets:string[]}){
+ const I=p.icon;
+ return <div className="stack"><section className="panel moduleIntro"><div className="moduleTitle"><div className="moduleIcon"><I size={22}/></div><div><h3>{p.title}</h3><p>{p.description}</p></div></div><button className="primary" disabled title="Backend API is the next implementation phase"><Plus size={15}/>{p.action}</button></section><section className="panel emptyModule"><div className="emptyModuleIcon"><I size={28}/></div><h3>No records yet</h3><p>This v2 management surface is now in the server UI. The next implementation phase will add its database model, API and imaging-node workflow.</p><div className="featureChecks">{p.bullets.map(x=><span key={x}><CheckCircle2 size={15}/>{x}</span>)}</div></section></div>
+}
+
+function AdminCenter(){
+ return <div className="adminGrid">
+  {[
+   ["Users & Roles",UserCog,"Accounts, RBAC and session management"],
+   ["Authentication",KeyRound,"Local login, AD/LDAP, Entra, MFA and passkeys"],
+   ["Imaging Nodes",Server,"Privileged capture and restore workers"],
+   ["PXE Infrastructure",Network,"Boot services, DHCP integration and network policy"],
+   ["Storage",Database,"Image repositories, capacity and replication"],
+   ["Security & Audit",ShieldCheck,"Certificates, secrets, policies and retention"]
+  ].map(([title,I,desc]:any)=><article className="panel adminTile" key={title}><I size={21}/><h3>{title}</h3><p>{desc}</p><button className="secondary" disabled>Configure</button></article>)}
+ </div>
+}
+
 function Crud(p:any){const [show,setShow]=useState(false);return <div className="stack"><section className="panel"><div className="sectionHead"><div><h3>{p.title}</h3><p>{p.help}</p></div><div className="toolbar">{p.extra}<button className="primary" onClick={()=>setShow(!show)}><Plus size={15}/>{show?"Close":"Add new"}</button></div></div>{show&&<div className="formWrap">{p.form}</div>}</section><section className="panel">{p.children}</section></div>}
 function F(p:{l:string;wide?:boolean;children:any}){return <label className={p.wide?"field wide":"field"}><span>{p.l}</span>{p.children}</label>}
 function Save(p:{editing:boolean;cancel:()=>void}){return <div className="formButtons wide"><button className="primary" type="submit">{p.editing?"Save changes":"Create"}</button>{p.editing&&<button className="secondary" type="button" onClick={p.cancel}>Cancel edit</button>}</div>}
@@ -123,5 +187,5 @@ function Alert(p:{kind:string;text:string;close:()=>void}){return <div className
 function Login(p:{onSuccess:()=>void}){
  const [username,setUsername]=useState("admin"),[password,setPassword]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
  async function submit(e:FormEvent){e.preventDefault();setBusy(true);setError("");try{const r=await fetch(API+"/api/auth/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.detail||"Login failed")}p.onSuccess()}catch(e:any){setError(e.message)}finally{setBusy(false)}}
- return <div className="loginPage"><form className="loginCard" onSubmit={submit}><div className="loginBrand"><div className="brandmark"><Boxes size={22}/></div><div><strong>ReForge</strong><span>Endpoint Deployment</span></div></div><h1>Sign in</h1><p>Manage imaging, devices, software and PXE deployment.</p>{error&&<div className="loginError">{error}</div>}<label><span>Username</span><input autoFocus autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)}/></label><label><span>Password</span><input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="primary loginButton" disabled={busy||!username||!password}>{busy?<Loader2 className="spin" size={16}/>:null} Sign in</button></form></div>
+ return <div className="loginPage"><div className="loginShell"><div className="loginBrandLarge"><div className="brandmark"><Boxes size={24}/></div><div><strong>ReForge</strong><span>Deployment Platform</span></div></div><form className="loginCard" onSubmit={submit}><h1>Sign in</h1><p>Use your administrator account to continue.</p>{error&&<div className="loginError">{error}</div>}<label><span>Username</span><input autoFocus autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)}/></label><label><span>Password</span><input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><div className="loginOptions"><label className="remember"><input type="checkbox"/> Remember me</label><button type="button">Forgot password?</button></div><button className="primary loginButton" disabled={busy||!username||!password}>{busy?<Loader2 className="spin" size={16}/>:null} Sign in</button></form><span className="loginFoot">ReForge · Secure endpoint deployment</span></div></div>
 }
