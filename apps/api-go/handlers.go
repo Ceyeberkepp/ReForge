@@ -593,6 +593,8 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 			ID: "default", Enabled: true, ServerURL: "http://reforge.local:8080",
 			BIOSBootFile: "undionly.kpxe", UEFIBootFile: "ipxe.efi",
 			DHCPMode: "existing", BootMenuTimeout: 5,
+			MenuTitle: "ReForge Deployment", DefaultItem: "deploy",
+			ShowDeploy: true, ShowRegister: true, ShowDiagnostics: true, ShowLocalBoot: true,
 		}
 		a.db.Create(&row)
 	}
@@ -607,12 +609,34 @@ func (a *App) savePXE(w http.ResponseWriter, r *http.Request) {
 	}
 	row.ID = "default"
 	if row.BootMenuTimeout < 1 { row.BootMenuTimeout = 5 }
+	if strings.TrimSpace(row.MenuTitle) == "" { row.MenuTitle = "ReForge Deployment" }
+	switch row.DefaultItem {
+	case "deploy", "register", "diagnostics", "local":
+	default:
+		row.DefaultItem = "deploy"
+	}
+	if !row.ShowDeploy && !row.ShowRegister && !row.ShowDiagnostics && !row.ShowLocalBoot {
+		row.ShowLocalBoot = true
+		row.DefaultItem = "local"
+	}
+	if row.DefaultItem == "deploy" && !row.ShowDeploy { row.DefaultItem = firstPXEMenuItem(row) }
+	if row.DefaultItem == "register" && !row.ShowRegister { row.DefaultItem = firstPXEMenuItem(row) }
+	if row.DefaultItem == "diagnostics" && !row.ShowDiagnostics { row.DefaultItem = firstPXEMenuItem(row) }
+	if row.DefaultItem == "local" && !row.ShowLocalBoot { row.DefaultItem = firstPXEMenuItem(row) }
 	if a.db.Save(&row).Error != nil {
 		writeJSON(w, 400, map[string]string{"detail": "save failed"})
 		return
 	}
 	a.audit(r, "save", "pxe", "default", true, "")
 	writeJSON(w, 200, row)
+}
+
+func firstPXEMenuItem(p PXEConfig) string {
+	if p.ShowDeploy { return "deploy" }
+	if p.ShowRegister { return "register" }
+	if p.ShowDiagnostics { return "diagnostics" }
+	if p.ShowLocalBoot { return "local" }
+	return "local"
 }
 
 func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
@@ -624,6 +648,8 @@ func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "exit")
 		return
 	}
+	if strings.TrimSpace(p.MenuTitle) == "" { p.MenuTitle = "ReForge Deployment" }
+	if p.DefaultItem == "" { p.DefaultItem = firstPXEMenuItem(p) }
 	timeout := p.BootMenuTimeout * 1000
 	apiVar := "$" + "{reforge-api}"
 	macVar := "$" + "{net0/mac}"
@@ -631,15 +657,27 @@ func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintln(w, "#!ipxe")
 	fmt.Fprintln(w, "set reforge-api "+p.ServerURL)
-	fmt.Fprintln(w, "menu ReForge Deployment")
-	fmt.Fprintln(w, "item deploy Deploy assigned image")
-	fmt.Fprintln(w, "item register Register this device")
-	fmt.Fprintln(w, "item local Boot local disk")
-	fmt.Fprintf(w, "choose --default deploy --timeout %d target && goto %s\n", timeout, targetVar)
-	fmt.Fprintln(w, ":deploy")
-	fmt.Fprintln(w, "chain "+apiVar+"/boot/deploy.ipxe?mac="+macVar+" || goto local")
-	fmt.Fprintln(w, ":register")
-	fmt.Fprintln(w, "chain "+apiVar+"/boot/register.ipxe?mac="+macVar+" || goto local")
+	fmt.Fprintln(w, "menu "+p.MenuTitle)
+	if p.ShowDeploy { fmt.Fprintln(w, "item deploy Deploy assigned image") }
+	if p.ShowRegister { fmt.Fprintln(w, "item register Register this device") }
+	if p.ShowDiagnostics { fmt.Fprintln(w, "item diagnostics Diagnostics and inventory") }
+	if p.ShowLocalBoot { fmt.Fprintln(w, "item local Boot local disk") }
+	fmt.Fprintf(w, "choose --default %s --timeout %d target && goto %s\n", p.DefaultItem, timeout, targetVar)
+	if p.ShowDeploy {
+		fmt.Fprintln(w, ":deploy")
+		fmt.Fprintln(w, "chain "+apiVar+"/boot/deploy.ipxe?mac="+macVar+" || goto local")
+	}
+	if p.ShowRegister {
+		fmt.Fprintln(w, ":register")
+		fmt.Fprintln(w, "chain "+apiVar+"/boot/register.ipxe?mac="+macVar+" || goto local")
+	}
+	if p.ShowDiagnostics {
+		fmt.Fprintln(w, ":diagnostics")
+		fmt.Fprintln(w, "echo ReForge diagnostics")
+		fmt.Fprintln(w, "echo Hardware inventory and imaging diagnostics")
+		fmt.Fprintln(w, "sleep 2")
+		fmt.Fprintln(w, "goto local")
+	}
 	fmt.Fprintln(w, ":local")
 	fmt.Fprintln(w, "exit")
 }
