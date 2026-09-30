@@ -52,7 +52,7 @@ table{color:#273142}th{color:#697586;border-color:#e6e9ee}td{color:#344054;borde
 .itemCard,.choice,.step,.infoGrid div{background:#fbfcfd;border-color:#e2e7ee}
 .meta span,.tagCloud span{background:#f4f6f8;border-color:#e1e5ea;color:#566273}
 
-.systemStrip{display:flex;justify-content:flex-end;align-items:center;gap:24px;margin:-58px 0 22px auto;width:max-content}
+.systemStrip{display:flex;justify-content:flex-end;align-items:center;gap:24px;margin:0 0 18px auto;width:max-content;max-width:100%;flex-wrap:wrap}
 .serverIdentity,.systemReady{display:flex;align-items:center;gap:10px}.serverIcon{width:42px;height:42px;border:1px solid #dfe5ec;border-radius:9px;display:grid;place-items:center;background:#fff}
 .serverIdentity b,.serverIdentity span,.systemReady b,.systemReady span{display:block}.serverIdentity b,.systemReady b{font-size:12px}.serverIdentity span,.systemReady span{font-size:10px;color:#7a8491;margin-top:2px}
 .systemReady{border-left:1px solid #dfe4ea;padding-left:22px}.systemReady b{color:#17844a}
@@ -83,3 +83,16 @@ table{color:#273142}th{color:#697586;border-color:#e6e9ee}td{color:#344054;borde
 
 @media(max-width:1100px){.pipelineFlow{grid-template-columns:repeat(3,1fr);gap:18px}.pipelineFlow:before{display:none}.dashboardGrid{grid-template-columns:1fr}.adminGrid{grid-template-columns:repeat(2,1fr)}.systemStrip{margin:0 0 18px}}
 @media(max-width:900px){.shell{grid-template-columns:76px 1fr}.workspace{min-width:0}.topbar{padding:0 14px}.themeSwitch button span{display:none}.accountCard{display:none}.navLabel{display:none}.globalSearch{width:100%}.topActions{display:none}.adminGrid{grid-template-columns:1fr}.pipelineFlow{grid-template-columns:repeat(2,1fr)}}
+
+.pxeDesignerGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(420px,.9fr);gap:14px}
+.bootOptionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.bootOptionGrid label{display:flex;gap:9px;align-items:flex-start;border:1px solid #e0e6ed;border-radius:8px;padding:11px;background:#fbfcfd}
+.bootOptionGrid input{width:auto;margin-top:2px}
+.bootOptionGrid b,.bootOptionGrid small{display:block}.bootOptionGrid b{font-size:12px}.bootOptionGrid small{font-size:10px;color:#7a8492;margin-top:2px}
+.bootPreviewPanel{min-width:0}.previewBadge{font-size:10px;font-weight:800;border:1px solid #d8dfe7;border-radius:999px;padding:4px 8px;color:#5c6775;background:#f6f8fa}
+.bootScreen{margin-top:18px;border-radius:8px;background:#09121d;color:#d8e6f3;min-height:410px;padding:26px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;display:flex;flex-direction:column;box-shadow:inset 0 0 0 1px #1f3345}
+.bootLogo{font-size:13px;color:#58a6ff;font-weight:800;letter-spacing:.8px}.bootTitle{font-size:20px;font-weight:800;margin:16px 0 20px;color:#f3f8fc}
+.bootMenu{display:grid;gap:6px}.bootMenuItem{display:grid;grid-template-columns:18px 1fr;column-gap:6px;padding:8px 10px;border-radius:4px;color:#a9bac8}.bootMenuItem b{font-size:12px}.bootMenuItem small{grid-column:2;font-size:9px;color:#728596;margin-top:2px}.bootMenuItem.selected{background:#12385a;color:#fff}.bootMenuItem.selected small{color:#b8d8f2}
+.bootEmpty{padding:14px;border:1px dashed #40546a;border-radius:6px;color:#9eb0bf}.bootFooter{margin-top:auto;padding-top:22px;font-size:9px;color:#667b8d}
+:root[data-theme="dark"] .bootOptionGrid label{background:#0c1118;border-color:#29333f}
+@media(max-width:1200px){.pxeDesignerGrid{grid-template-columns:1fr}.bootScreen{min-height:340px}}
