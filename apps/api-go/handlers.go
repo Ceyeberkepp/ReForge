@@ -597,6 +597,15 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 			ShowDeploy: true, ShowRegister: true, ShowDiagnostics: true, ShowLocalBoot: true,
 		}
 		a.db.Create(&row)
+	} else if strings.TrimSpace(row.MenuTitle) == "" {
+		// Upgrade PXE settings created before the boot-menu designer existed.
+		row.MenuTitle = "ReForge Deployment"
+		row.DefaultItem = "deploy"
+		row.ShowDeploy = true
+		row.ShowRegister = true
+		row.ShowDiagnostics = true
+		row.ShowLocalBoot = true
+		a.db.Save(&row)
 	}
 	writeJSON(w, 200, row)
 }
