@@ -229,7 +229,7 @@ type CloneImage struct {
 type BrandingAsset struct {
 	ID          string    `gorm:"primaryKey;size:32" json:"id"`
 	ContentType string    `json:"content_type"`
-	Data        []byte    `gorm:"type:blob" json:"-"`
+	Data        []byte    `json:"-"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
