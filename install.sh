@@ -6,16 +6,90 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-command -v docker >/dev/null 2>&1 || {
-  echo "Docker Engine is required." >&2
+if [[ ! -r /etc/os-release ]]; then
+  echo "ReForge one-click install currently supports Debian and Ubuntu Linux." >&2
   exit 1
-}
-command -v openssl >/dev/null 2>&1 || {
-  echo "OpenSSL is required to generate installation secrets." >&2
+fi
+
+. /etc/os-release
+
+case "${ID:-}" in
+  debian|ubuntu) ;;
+  *)
+    echo "Unsupported distribution: ${PRETTY_NAME:-${ID:-unknown}}" >&2
+    echo "Use Debian or Ubuntu for the one-click installer." >&2
+    exit 1
+    ;;
+esac
+
+echo "[1/6] Installing base system dependencies..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  sudo \
+  git \
+  openssl \
+  gnupg \
+  coreutils \
+  iproute2
+
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+  echo "[2/6] Installing Docker Engine and Docker Compose..."
+
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL "https://download.docker.com/linux/${ID}/gpg" \
+    | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+
+  ARCH="$(dpkg --print-architecture)"
+  CODENAME="${VERSION_CODENAME:-}"
+  if [[ -z "${CODENAME}" ]]; then
+    CODENAME="$(. /etc/os-release && echo "${UBUNTU_CODENAME:-}")"
+  fi
+  if [[ -z "${CODENAME}" ]]; then
+    echo "Unable to determine Debian/Ubuntu release codename." >&2
+    exit 1
+  fi
+
+  cat >/etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/${ID}
+Suites: ${CODENAME}
+Components: stable
+Architectures: ${ARCH}
+Signed-By: /etc/apt/keyrings/docker.gpg
+EOF
+
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin
+else
+  echo "[2/6] Docker Engine and Compose are already installed."
+fi
+
+echo "[3/6] Starting Docker..."
+systemctl enable --now docker 2>/dev/null || true
+
+if ! docker info >/dev/null 2>&1; then
+  if command -v service >/dev/null 2>&1; then
+    service docker start 2>/dev/null || true
+  fi
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker is installed but the daemon is not available." >&2
+  echo "If this is an LXC/container, enable nesting/container-runtime support and restart the guest." >&2
   exit 1
-}
+fi
+
 docker compose version >/dev/null 2>&1 || {
-  echo "Docker Compose plugin is required." >&2
+  echo "Docker Compose plugin installation failed." >&2
   exit 1
 }
 
@@ -47,7 +121,7 @@ HOST_IP="${REFORGE_HOST_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 HOST_IP="${HOST_IP:-127.0.0.1}"
 
 echo
-echo "ReForge database"
+echo "[4/6] Configuring ReForge..."\necho\necho "ReForge database"
 echo "  1) PostgreSQL (recommended)"
 echo "  2) MariaDB / MySQL"
 echo "  3) Microsoft SQL Server Express"
@@ -149,7 +223,7 @@ if [[ "${DB_CHOICE}" == "3" ]]; then
   done
 fi
 
-docker compose -f infra/docker-compose.yml up -d --build
+echo "[5/6] Building and starting ReForge..."\ndocker compose -f infra/docker-compose.yml up -d --build\n\necho "[6/6] Verifying ReForge services..."\ndocker compose -f infra/docker-compose.yml ps
 
 echo
 echo "ReForge installation started successfully."
