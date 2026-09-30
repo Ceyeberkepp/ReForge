@@ -304,12 +304,21 @@ func (a *App) saveHost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"detail": "invalid host"})
 		return
 	}
-	mac, err := normalizeMAC(row.MACAddress)
-	if err != nil {
-		writeJSON(w, 400, map[string]string{"detail": err.Error()})
+	if strings.TrimSpace(row.Hostname) == "" {
+		writeJSON(w, 400, map[string]string{"detail": "hostname is required"})
 		return
 	}
-	row.MACAddress = mac
+	if row.MACAddress != nil && strings.TrimSpace(*row.MACAddress) != "" {
+		mac, err := normalizeMAC(*row.MACAddress)
+		if err != nil {
+			writeJSON(w, 400, map[string]string{"detail": err.Error()})
+			return
+		}
+		row.MACAddress = &mac
+	} else {
+		row.MACAddress = nil
+	}
+	if row.HardwareUUID != nil && strings.TrimSpace(*row.HardwareUUID) == "" { row.HardwareUUID = nil }
 	if id := chi.URLParam(r, "id"); id != "" {
 		row.ID = id
 	} else {
@@ -337,6 +346,7 @@ func (a *App) deleteHost(w http.ResponseWriter, r *http.Request) {
 func (a *App) registerHost(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		MACAddress   string `json:"mac_address"`
+		HardwareUUID string `json:"hardware_uuid"`
 		SerialNumber string `json:"serial_number"`
 		Manufacturer string `json:"manufacturer"`
 		Model        string `json:"model"`
@@ -346,25 +356,48 @@ func (a *App) registerHost(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"detail": "invalid request"})
 		return
 	}
-	mac, err := normalizeMAC(input.MACAddress)
-	if err != nil {
-		writeJSON(w, 400, map[string]string{"detail": err.Error()})
+	var macPtr *string
+	if strings.TrimSpace(input.MACAddress) != "" {
+		mac, err := normalizeMAC(input.MACAddress)
+		if err != nil {
+			writeJSON(w, 400, map[string]string{"detail": err.Error()})
+			return
+		}
+		macPtr = &mac
+	}
+	var uuidPtr *string
+	if strings.TrimSpace(input.HardwareUUID) != "" {
+		v := strings.TrimSpace(input.HardwareUUID)
+		uuidPtr = &v
+	}
+	if macPtr == nil && uuidPtr == nil && strings.TrimSpace(input.SerialNumber) == "" && strings.TrimSpace(input.Hostname) == "" {
+		writeJSON(w, 400, map[string]string{"detail": "provide hostname, serial number, hardware UUID, or MAC address"})
 		return
 	}
 	var host Host
 	now := time.Now().UTC()
-	if a.db.First(&host, "mac_address = ?", mac).Error != nil {
+	found := false
+	if macPtr != nil && a.db.First(&host, "mac_address = ?", *macPtr).Error == nil { found = true }
+	if !found && uuidPtr != nil && a.db.First(&host, "hardware_uuid = ?", *uuidPtr).Error == nil { found = true }
+	if !found && strings.TrimSpace(input.SerialNumber) != "" && a.db.First(&host, "serial_number = ?", strings.TrimSpace(input.SerialNumber)).Error == nil { found = true }
+	if !found {
 		host = Host{
-			ID: uuid.NewString(), MACAddress: mac, Hostname: input.Hostname,
-			SerialNumber: input.SerialNumber, Manufacturer: input.Manufacturer,
+			ID: uuid.NewString(), MACAddress: macPtr, HardwareUUID: uuidPtr, Hostname: strings.TrimSpace(input.Hostname),
+			SerialNumber: strings.TrimSpace(input.SerialNumber), Manufacturer: input.Manufacturer,
 			Model: input.Model, LastSeen: &now,
 		}
 		if host.Hostname == "" {
-			host.Hostname = "NEW-" + strings.ToUpper(strings.ReplaceAll(mac, ":", "")[6:])
+			suffix := strings.TrimSpace(input.SerialNumber)
+			if suffix == "" && macPtr != nil { suffix = strings.ToUpper(strings.ReplaceAll(*macPtr, ":", "")[6:]) }
+			if suffix == "" { suffix = strings.ToUpper(uuid.NewString()[:8]) }
+			host.Hostname = "NEW-" + suffix
 		}
 		a.db.Create(&host)
 	} else {
 		host.LastSeen = &now
+		if macPtr != nil { host.MACAddress = macPtr }
+		if uuidPtr != nil { host.HardwareUUID = uuidPtr }
+		if input.Hostname != "" { host.Hostname = input.Hostname }
 		if input.SerialNumber != "" { host.SerialNumber = input.SerialNumber }
 		if input.Manufacturer != "" { host.Manufacturer = input.Manufacturer }
 		if input.Model != "" { host.Model = input.Model }
@@ -598,6 +631,10 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 			BrandName: "ReForge", MenuSubtitle: "Secure endpoint deployment",
 			SupportText: "Contact IT support for assistance", AccentColor: "#1473e6",
 			ShowLogo: true, ShowBackground: true, RequireLogin: true,
+			InstallTitle: "Install operating system", InstallSubtitle: "Choose ISO, Gold Image, or Clone Image",
+			CaptureTitle: "Capture image", CaptureSubtitle: "Create a reusable Gold or Clone image",
+			LoadingTitle: "ReForge is preparing this device", LoadingMessage: "Please wait while the deployment environment is loaded.",
+			TextColor: "#ffffff", PanelColor: "#09121d", OverlayOpacity: 42,
 		}
 		a.db.Create(&row)
 	} else {
@@ -619,6 +656,15 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 			row.ShowLogo = true
 			row.ShowBackground = true
 			row.RequireLogin = true
+			row.InstallTitle = "Install operating system"
+			row.InstallSubtitle = "Choose ISO, Gold Image, or Clone Image"
+			row.CaptureTitle = "Capture image"
+			row.CaptureSubtitle = "Create a reusable Gold or Clone image"
+			row.LoadingTitle = "ReForge is preparing this device"
+			row.LoadingMessage = "Please wait while the deployment environment is loaded."
+			row.TextColor = "#ffffff"
+			row.PanelColor = "#09121d"
+			row.OverlayOpacity = 42
 			changed = true
 		}
 		if changed { a.db.Save(&row) }
@@ -637,6 +683,13 @@ func (a *App) savePXE(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(row.MenuTitle) == "" { row.MenuTitle = "ReForge Deployment" }
 	if strings.TrimSpace(row.BrandName) == "" { row.BrandName = "ReForge" }
 	if strings.TrimSpace(row.AccentColor) == "" { row.AccentColor = "#1473e6" }
+	if strings.TrimSpace(row.InstallTitle) == "" { row.InstallTitle = "Install operating system" }
+	if strings.TrimSpace(row.CaptureTitle) == "" { row.CaptureTitle = "Capture image" }
+	if strings.TrimSpace(row.LoadingTitle) == "" { row.LoadingTitle = "ReForge is preparing this device" }
+	if strings.TrimSpace(row.TextColor) == "" { row.TextColor = "#ffffff" }
+	if strings.TrimSpace(row.PanelColor) == "" { row.PanelColor = "#09121d" }
+	if row.OverlayOpacity < 0 { row.OverlayOpacity = 0 }
+	if row.OverlayOpacity > 90 { row.OverlayOpacity = 90 }
 	switch row.DefaultItem {
 	case "deploy", "register", "diagnostics", "local":
 	default:
