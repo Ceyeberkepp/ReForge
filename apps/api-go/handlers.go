@@ -766,13 +766,13 @@ func (a *App) ipxe(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, ":deploy")
 		if p.RequireLogin {
 			fmt.Fprintln(w, "login")
-			fmt.Fprintln(w, "chain "+pxeAuthCatalogURL(p.ServerURL)+"?mac="+macVar+" || goto failedlogin")
+			fmt.Fprintln(w, "chain "+pxeAuthCatalogURL(p.ServerURL)+"?mac="+macVar+"&uuid=${uuid} || goto failedlogin")
 			fmt.Fprintln(w, ":failedlogin")
 			fmt.Fprintln(w, "echo Authentication failed or access denied")
 			fmt.Fprintln(w, "sleep 2")
 			fmt.Fprintln(w, "goto local")
 		} else {
-			fmt.Fprintln(w, "chain "+apiVar+"/boot/catalog.ipxe?mac="+macVar+" || goto local")
+			fmt.Fprintln(w, "chain "+apiVar+"/boot/catalog.ipxe?mac="+macVar+"&uuid=${uuid} || goto local")
 		}
 	}
 	if p.ShowRegister {
