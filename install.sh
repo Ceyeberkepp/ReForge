@@ -121,7 +121,9 @@ HOST_IP="${REFORGE_HOST_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 HOST_IP="${HOST_IP:-127.0.0.1}"
 
 echo
-echo "[4/6] Configuring ReForge..."\necho\necho "ReForge database"
+echo "[4/6] Configuring ReForge..."
+echo
+echo "ReForge database"
 echo "  1) PostgreSQL (recommended)"
 echo "  2) MariaDB / MySQL"
 echo "  3) Microsoft SQL Server Express"
@@ -223,7 +225,11 @@ if [[ "${DB_CHOICE}" == "3" ]]; then
   done
 fi
 
-echo "[5/6] Building and starting ReForge..."\ndocker compose -f infra/docker-compose.yml up -d --build\n\necho "[6/6] Verifying ReForge services..."\ndocker compose -f infra/docker-compose.yml ps
+echo "[5/6] Building and starting ReForge..."
+docker compose -f infra/docker-compose.yml up -d --build
+
+echo "[6/6] Verifying ReForge services..."
+docker compose -f infra/docker-compose.yml ps
 
 echo
 echo "ReForge installation started successfully."
