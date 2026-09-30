@@ -600,22 +600,28 @@ func (a *App) getPXE(w http.ResponseWriter, r *http.Request) {
 			ShowLogo: true, ShowBackground: true, RequireLogin: true,
 		}
 		a.db.Create(&row)
-	} else if strings.TrimSpace(row.MenuTitle) == "" {
-		// Upgrade PXE settings created before the boot-menu designer existed.
-		row.MenuTitle = "ReForge Deployment"
-		row.DefaultItem = "deploy"
-		row.ShowDeploy = true
-		row.ShowRegister = true
-		row.ShowDiagnostics = true
-		row.ShowLocalBoot = true
-		row.BrandName = "ReForge"
-		row.MenuSubtitle = "Secure endpoint deployment"
-		row.SupportText = "Contact IT support for assistance"
-		row.AccentColor = "#1473e6"
-		row.ShowLogo = true
-		row.ShowBackground = true
-		row.RequireLogin = true
-		a.db.Save(&row)
+	} else {
+		changed := false
+		if strings.TrimSpace(row.MenuTitle) == "" {
+			row.MenuTitle = "ReForge Deployment"
+			row.DefaultItem = "deploy"
+			row.ShowDeploy = true
+			row.ShowRegister = true
+			row.ShowDiagnostics = true
+			row.ShowLocalBoot = true
+			changed = true
+		}
+		if strings.TrimSpace(row.BrandName) == "" {
+			row.BrandName = "ReForge"
+			row.MenuSubtitle = "Secure endpoint deployment"
+			row.SupportText = "Contact IT support for assistance"
+			row.AccentColor = "#1473e6"
+			row.ShowLogo = true
+			row.ShowBackground = true
+			row.RequireLogin = true
+			changed = true
+		}
+		if changed { a.db.Save(&row) }
 	}
 	writeJSON(w, 200, row)
 }
