@@ -233,6 +233,17 @@ type BrandingAsset struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type PXETask struct {
+	ID          string    `gorm:"primaryKey" json:"id"`
+	HostMAC     string    `gorm:"index;size:32" json:"host_mac"`
+	Action      string    `gorm:"index;size:32" json:"action"`
+	SourceType  string    `gorm:"index;size:32" json:"source_type"`
+	SourceID    string    `gorm:"index" json:"source_id"`
+	RequestedBy string    `gorm:"index;size:120" json:"requested_by"`
+	Status      string    `gorm:"index;size:24" json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type Session struct {
 	Token     string `gorm:"primaryKey;size:96"`
 	UserID    string `gorm:"index"`
@@ -309,7 +320,7 @@ func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&GoldImage{}, &SoftwarePackage{}, &Department{}, &Host{},
 		&DirectoryConfig{}, &DeploymentJob{}, &PXEConfig{},
-		&AuditEvent{}, &User{}, &UserGroup{}, &ISOImage{}, &CloneImage{}, &BrandingAsset{}, &Session{},
+		&AuditEvent{}, &User{}, &UserGroup{}, &ISOImage{}, &CloneImage{}, &BrandingAsset{}, &PXETask{}, &Session{},
 	)
 }
 
