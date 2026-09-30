@@ -163,6 +163,10 @@ Security-related design includes:
 
 See `docs/security-compliance.md`.
 
+## ReForge v2 blueprint
+
+The planned ReForge v2 product direction, UI structure, ISO/Gold/Clone workflows, task sequences, imaging-node architecture, FOG/MDT-inspired capabilities, and macOS provisioning strategy are documented in `docs/reforge-v2-blueprint.md`.
+
 ## Compliance
 
 ReForge is designed to **support** environments working toward SOC 2, HIPAA and GDPR requirements. No software repository by itself makes an organization compliant; operational controls, risk assessments, hosting, identity configuration, policies, evidence, contracts, retention and independent assessments still matter.
