@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -177,7 +178,8 @@ func (a *App) basicPXEUser(r *http.Request) *User {
 }
 
 func (a *App) pxeCatalog(w http.ResponseWriter,r *http.Request){
-	u:=a.basicPXEUser(r);if u==nil||!a.hasPermission(u,"pxe.login"){w.Header().Set("WWW-Authenticate",`Basic realm="ReForge PXE"`);w.WriteHeader(401);return}
+	u:=a.pxeUserFromToken(r);if u==nil||!a.hasPermission(u,"pxe.login"){w.WriteHeader(401);return}
+	token:=a.newPXEAccessToken(u)
 	perms:=a.userPermissions(u)
 	w.Header().Set("Content-Type","text/plain")
 	fmt.Fprintln(w,"#!ipxe")
@@ -245,5 +247,20 @@ func (a *App) pxeAction(w http.ResponseWriter,r *http.Request){
 }
 
 func decodeJSON(r *http.Request,v any) error {
-	return jsonUnmarshalBody(r,v)
+	return json.NewDecoder(r.Body).Decode(v)
+}
+
+func (a *App) newPXEAccessToken(u *User) string {
+	token:=randomToken(32)
+	_ = a.db.Create(&PXEAccessToken{Token:token,UserID:u.ID,ExpiresAt:time.Now().UTC().Add(10*time.Minute),CreatedAt:time.Now().UTC()}).Error
+	return token
+}
+
+func (a *App) pxeUserFromToken(r *http.Request) *User {
+	token:=strings.TrimSpace(r.URL.Query().Get("token")); if token=="" { return nil }
+	var t PXEAccessToken
+	if a.db.First(&t,"token = ? AND expires_at > ?",token,time.Now().UTC()).Error!=nil { return nil }
+	var u User
+	if a.db.First(&u,"id = ? AND disabled = ?",t.UserID,false).Error!=nil { return nil }
+	return &u
 }
