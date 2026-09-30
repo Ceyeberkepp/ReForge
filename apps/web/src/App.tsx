@@ -132,15 +132,20 @@ function Deployments(p:any){
 function Directory(p:any){const [f,setF]=useState<Dir>(p.value),[password,setPassword]=useState("");useEffect(()=>setF(p.value),[p.value]);async function save(e:FormEvent){e.preventDefault();try{await req("/api/directory",{method:"PUT",body:JSON.stringify(f)});p.note("Directory settings saved");p.changed()}catch(e:any){p.err(e.message)}}async function test(){try{const r=await req("/api/directory/test",{method:"POST",body:JSON.stringify({...f,password})});p.note(r.message)}catch(e:any){p.err(e.message)}}return <section className="panel"><h3>Active Directory / LDAP</h3><p>Use LDAPS where available. The test password is not stored.</p><form onSubmit={save} className="formGrid formWrap"><F l="Domain"><input value={f.domain} onChange={e=>setF({...f,domain:e.target.value})}/></F><F l="Domain controller"><input value={f.domain_controller} onChange={e=>setF({...f,domain_controller:e.target.value})}/></F><F l="Protocol"><select value={f.protocol} onChange={e=>setF({...f,protocol:e.target.value,port:e.target.value==="ldaps"?636:389})}><option value="ldaps">LDAPS</option><option value="starttls">LDAP + StartTLS</option><option value="ldap">Plain LDAP (disabled by default)</option></select></F><F l="Port"><input type="number" value={f.port} onChange={e=>setF({...f,port:Number(e.target.value)})}/></F><F l="Base DN" wide><input value={f.base_dn} onChange={e=>setF({...f,base_dn:e.target.value})}/></F><F l="Service account"><input value={f.service_account} onChange={e=>setF({...f,service_account:e.target.value})}/></F><F l="Default computer OU"><input value={f.default_computer_ou} onChange={e=>setF({...f,default_computer_ou:e.target.value})}/></F><F l="Password for test"><input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></F><div className="formButtons wide"><button className="primary">Save settings</button><button className="secondary" type="button" disabled={!password} onClick={test}><ShieldCheck size={15}/> Test connection</button></div></form></section>}
 
 function PXE(){
- const [f,setF]=useState<any>(null),[saved,setSaved]=useState(false),[error,setError]=useState(""),[assetVersion,setAssetVersion]=useState(Date.now()),[logoOK,setLogoOK]=useState(true),[bgOK,setBgOK]=useState(true);
+ const [f,setF]=useState<any>(null),[saved,setSaved]=useState(false),[error,setError]=useState(""),[assetVersion,setAssetVersion]=useState(Date.now()),[logoOK,setLogoOK]=useState(true),[bgOK,setBgOK]=useState(true),[preview,setPreview]=useState<"boot"|"install"|"capture"|"loading">("boot");
  useEffect(()=>{req("/api/pxe").then((x:any)=>setF({
    menu_title:"ReForge Deployment",default_item:"deploy",
    show_deploy:true,show_register:true,show_diagnostics:true,show_local_boot:true,
    brand_name:"ReForge",menu_subtitle:"Secure endpoint deployment",support_text:"Contact IT support for assistance",
-   accent_color:"#1473e6",show_logo:true,show_background:true,require_login:true,...x
+   accent_color:"#1473e6",text_color:"#ffffff",panel_color:"#09121d",overlay_opacity:42,
+   show_logo:true,show_background:true,require_login:true,
+   install_title:"Install operating system",install_subtitle:"Choose ISO, Gold Image, or Clone Image",
+   capture_title:"Capture image",capture_subtitle:"Create a reusable Gold or Clone image",
+   loading_title:"ReForge is preparing this device",loading_message:"Please wait while the deployment environment is loaded.",
+   ...x
  })).catch((e:any)=>setError(e.message))},[]);
  if(!f)return <section className="panel"><div className="loading"><Loader2 className="spin"/> Loading PXE configuration...</div></section>;
- async function save(){try{const updated=await req("/api/pxe",{method:"PUT",body:JSON.stringify({...f,boot_menu_timeout:Number(f.boot_menu_timeout)})});setF(updated);setSaved(true);setTimeout(()=>setSaved(false),2500)}catch(e:any){setError(e.message)}}
+ async function save(){try{const updated=await req("/api/pxe",{method:"PUT",body:JSON.stringify({...f,boot_menu_timeout:Number(f.boot_menu_timeout),overlay_opacity:Number(f.overlay_opacity)})});setF(updated);setSaved(true);setTimeout(()=>setSaved(false),2500)}catch(e:any){setError(e.message)}}
  async function upload(kind:"logo"|"background",file?:File){if(!file)return;const form=new FormData();form.append("file",file);try{const r=await fetch(API+"/api/pxe/assets/"+kind,{method:"POST",credentials:"include",body:form});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.detail||"Upload failed")}setAssetVersion(Date.now());if(kind==="logo")setLogoOK(true);else setBgOK(true)}catch(e:any){setError(e.message)}}
  const bootURL=(f.server_url||window.location.origin)+"/boot/ipxe";
  const entries=[
@@ -151,42 +156,54 @@ function PXE(){
  ] as const;
  const visible=entries.filter(x=>x[2]);
  function toggle(k:string,v:boolean){const next={...f,[k]:v};const opts=[["deploy","show_deploy"],["register","show_register"],["diagnostics","show_diagnostics"],["local","show_local_boot"]].filter(([,key])=>Boolean(next[key]));if(!opts.some(([id])=>id===next.default_item))next.default_item=opts[0]?.[0]||"local";setF(next)}
- const previewStyle:any={};
- if(f.show_background&&bgOK) previewStyle.backgroundImage=`linear-gradient(rgba(5,15,25,.42),rgba(5,15,25,.42)),url("/boot/assets/background?v=${assetVersion}")`;
+ const opacity=Math.max(0,Math.min(90,Number(f.overlay_opacity)||0))/100;
+ const previewStyle:any={backgroundColor:f.panel_color||"#09121d",color:f.text_color||"#ffffff","--pxe-accent":f.accent_color||"#1473e6"};
+ if(f.show_background&&bgOK) previewStyle.backgroundImage=`linear-gradient(rgba(5,15,25,${opacity}),rgba(5,15,25,${opacity})),url("/boot/assets/background?v=${assetVersion}")`;
+
+ const screenTitle=preview==="boot"?(f.menu_title||"ReForge Deployment"):preview==="install"?(f.install_title||"Install operating system"):preview==="capture"?(f.capture_title||"Capture image"):(f.loading_title||"ReForge is preparing this device");
+ const screenSubtitle=preview==="boot"?f.menu_subtitle:preview==="install"?f.install_subtitle:preview==="capture"?f.capture_subtitle:f.loading_message;
+
  return <div className="stack">
-  <section className="panel"><div className="sectionHead"><div><h3>PXE boot service</h3><p>Configure ReForge to work with your existing DHCP service or a dedicated imaging network.</p></div><label className="switch"><input type="checkbox" checked={f.enabled} onChange={e=>setF({...f,enabled:e.target.checked})}/><span>{f.enabled?"Enabled":"Disabled"}</span></label></div>{error&&<div className="alert error">{error}</div>}<div className="formGrid formWrap"><F l="ReForge server URL"><input value={f.server_url} onChange={e=>setF({...f,server_url:e.target.value})}/></F><F l="DHCP integration"><select value={f.dhcp_mode} onChange={e=>setF({...f,dhcp_mode:e.target.value})}><option value="existing">Use existing DHCP server</option><option value="proxy">Proxy DHCP / imaging VLAN</option><option value="managed">ReForge-managed DHCP</option></select></F><F l="DHCP server"><input value={f.dhcp_server||""} onChange={e=>setF({...f,dhcp_server:e.target.value})}/></F><F l="Next server / TFTP"><input value={f.next_server||""} onChange={e=>setF({...f,next_server:e.target.value,tftp_server:e.target.value})}/></F><F l="Legacy BIOS boot file"><input value={f.bios_boot_file} onChange={e=>setF({...f,bios_boot_file:e.target.value})}/></F><F l="UEFI x64 boot file"><input value={f.uefi_boot_file} onChange={e=>setF({...f,uefi_boot_file:e.target.value})}/></F><label className="check"><input type="checkbox" checked={f.allow_unknown} onChange={e=>setF({...f,allow_unknown:e.target.checked})}/> Allow unknown devices to reach registration</label><label className="check"><input type="checkbox" checked={f.require_login} onChange={e=>setF({...f,require_login:e.target.checked})}/> Require ReForge credentials before deployment sources are shown</label></div></section>
+  <section className="panel pxeServicePanel"><div className="sectionHead"><div><h3>PXE boot service</h3><p>Configure ReForge to work with your existing DHCP service or a dedicated imaging network.</p></div><label className="switch"><input type="checkbox" checked={f.enabled} onChange={e=>setF({...f,enabled:e.target.checked})}/><span>{f.enabled?"Enabled":"Disabled"}</span></label></div>{error&&<div className="alert error">{error}</div>}<div className="formGrid formWrap"><F l="ReForge server URL"><input value={f.server_url} onChange={e=>setF({...f,server_url:e.target.value})}/></F><F l="DHCP integration"><select value={f.dhcp_mode} onChange={e=>setF({...f,dhcp_mode:e.target.value})}><option value="existing">Use existing DHCP server</option><option value="proxy">Proxy DHCP / imaging VLAN</option><option value="managed">ReForge-managed DHCP</option></select></F><F l="DHCP server"><input value={f.dhcp_server||""} onChange={e=>setF({...f,dhcp_server:e.target.value})}/></F><F l="Next server / TFTP"><input value={f.next_server||""} onChange={e=>setF({...f,next_server:e.target.value,tftp_server:e.target.value})}/></F><F l="Legacy BIOS boot file"><input value={f.bios_boot_file} onChange={e=>setF({...f,bios_boot_file:e.target.value})}/></F><F l="UEFI x64 boot file"><input value={f.uefi_boot_file} onChange={e=>setF({...f,uefi_boot_file:e.target.value})}/></F><label className="check"><input type="checkbox" checked={f.allow_unknown} onChange={e=>setF({...f,allow_unknown:e.target.checked})}/> Allow unknown devices to reach registration</label><label className="check"><input type="checkbox" checked={f.require_login} onChange={e=>setF({...f,require_login:e.target.checked})}/> Require credentials before ISO, Gold, Clone, Install or Capture options are shown</label></div></section>
 
   <section className="pxeDesignerGrid">
    <article className="panel">
-    <div className="sectionHead"><div><h3>Boot Menu & Branding</h3><p>Customize company branding and the real PXE menu.</p></div></div>
+    <div className="sectionHead"><div><h3>PXE Branding & Screens</h3><p>Customize the boot menu, install, capture and loading screens from one place.</p></div></div>
+    <div className="screenTabs">{(["boot","install","capture","loading"] as const).map(x=><button key={x} className={preview===x?"active":""} onClick={()=>setPreview(x)}>{x==="boot"?"Boot Menu":x==="install"?"Install":x==="capture"?"Capture":"Loading"}</button>)}</div>
     <div className="formGrid formWrap">
      <F l="Company / organization"><input value={f.brand_name||""} onChange={e=>setF({...f,brand_name:e.target.value})}/></F>
-     <F l="Menu title"><input value={f.menu_title||""} onChange={e=>setF({...f,menu_title:e.target.value})}/></F>
-     <F l="Subtitle"><input value={f.menu_subtitle||""} onChange={e=>setF({...f,menu_subtitle:e.target.value})}/></F>
      <F l="Support / footer text"><input value={f.support_text||""} onChange={e=>setF({...f,support_text:e.target.value})}/></F>
+     {preview==="boot"&&<><F l="Boot menu title"><input value={f.menu_title||""} onChange={e=>setF({...f,menu_title:e.target.value})}/></F><F l="Boot subtitle"><input value={f.menu_subtitle||""} onChange={e=>setF({...f,menu_subtitle:e.target.value})}/></F><F l="Default selection"><select value={f.default_item||"deploy"} onChange={e=>setF({...f,default_item:e.target.value})}>{visible.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></F><F l="Timeout (seconds)"><input type="number" min="1" max="60" value={f.boot_menu_timeout} onChange={e=>setF({...f,boot_menu_timeout:Number(e.target.value)})}/></F></>}
+     {preview==="install"&&<><F l="Install screen title" wide><input value={f.install_title||""} onChange={e=>setF({...f,install_title:e.target.value})}/></F><F l="Install screen subtitle" wide><input value={f.install_subtitle||""} onChange={e=>setF({...f,install_subtitle:e.target.value})}/></F></>}
+     {preview==="capture"&&<><F l="Capture screen title" wide><input value={f.capture_title||""} onChange={e=>setF({...f,capture_title:e.target.value})}/></F><F l="Capture screen subtitle" wide><input value={f.capture_subtitle||""} onChange={e=>setF({...f,capture_subtitle:e.target.value})}/></F></>}
+     {preview==="loading"&&<><F l="Loading screen title" wide><input value={f.loading_title||""} onChange={e=>setF({...f,loading_title:e.target.value})}/></F><F l="Loading / progress message" wide><input value={f.loading_message||""} onChange={e=>setF({...f,loading_message:e.target.value})}/></F></>}
      <F l="Accent color"><input type="color" value={f.accent_color||"#1473e6"} onChange={e=>setF({...f,accent_color:e.target.value})}/></F>
-     <F l="Default selection"><select value={f.default_item||"deploy"} onChange={e=>setF({...f,default_item:e.target.value})}>{visible.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></F>
-     <F l="Timeout (seconds)"><input type="number" min="1" max="60" value={f.boot_menu_timeout} onChange={e=>setF({...f,boot_menu_timeout:Number(e.target.value)})}/></F><div></div>
+     <F l="Text color"><input type="color" value={f.text_color||"#ffffff"} onChange={e=>setF({...f,text_color:e.target.value})}/></F>
+     <F l="Panel/background fallback"><input type="color" value={f.panel_color||"#09121d"} onChange={e=>setF({...f,panel_color:e.target.value})}/></F>
+     <F l={"Background overlay "+String(f.overlay_opacity||0)+"%"}><input type="range" min="0" max="90" value={f.overlay_opacity||0} onChange={e=>setF({...f,overlay_opacity:Number(e.target.value)})}/></F>
      <F l="Logo image"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>upload("logo",e.target.files?.[0])}/></F>
      <F l="Background image"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>upload("background",e.target.files?.[0])}/></F>
      <label className="check"><input type="checkbox" checked={f.show_logo} onChange={e=>setF({...f,show_logo:e.target.checked})}/> Show logo</label>
-     <label className="check"><input type="checkbox" checked={f.show_background} onChange={e=>setF({...f,show_background:e.target.checked})}/> Show background where iPXE graphics are supported</label>
-     <div className="wide bootOptionGrid">
+     <label className="check"><input type="checkbox" checked={f.show_background} onChange={e=>setF({...f,show_background:e.target.checked})}/> Show uploaded background when supported</label>
+     {preview==="boot"&&<div className="wide bootOptionGrid">
       <label><input type="checkbox" checked={Boolean(f.show_deploy)} onChange={e=>toggle("show_deploy",e.target.checked)}/><span><b>Deployment portal</b><small>Authenticated Install / Capture menu</small></span></label>
       <label><input type="checkbox" checked={Boolean(f.show_register)} onChange={e=>toggle("show_register",e.target.checked)}/><span><b>Register</b><small>Enroll an unknown device</small></span></label>
       <label><input type="checkbox" checked={Boolean(f.show_diagnostics)} onChange={e=>toggle("show_diagnostics",e.target.checked)}/><span><b>Diagnostics</b><small>Inventory and troubleshooting</small></span></label>
       <label><input type="checkbox" checked={Boolean(f.show_local_boot)} onChange={e=>toggle("show_local_boot",e.target.checked)}/><span><b>Local Boot</b><small>Continue to installed OS</small></span></label>
-     </div>
-     <div className="wide formButtons"><button className="primary" onClick={save}>Save PXE settings</button>{saved&&<span className="savedText"><CheckCircle2 size={15}/> Saved and active</span>}</div>
+     </div>}
+     <div className="wide formButtons"><button className="primary" onClick={save}>Save PXE customization</button>{saved&&<span className="savedText"><CheckCircle2 size={15}/> Saved and active</span>}</div>
     </div>
    </article>
 
-   <article className="panel bootPreviewPanel"><div className="sectionHead"><div><h3>Live boot preview</h3><p>Logo, colors, background, names and menu update here before save.</p></div><span className="previewBadge">PXE</span></div>
-    <div className="bootScreen branded" style={{...previewStyle,"--pxe-accent":f.accent_color||"#1473e6"} as any}>
+   <article className="panel bootPreviewPanel"><div className="sectionHead"><div><h3>{preview==="boot"?"Boot menu preview":preview==="install"?"Install screen preview":preview==="capture"?"Capture screen preview":"Loading screen preview"}</h3><p>Preview updates immediately before you save.</p></div><span className="previewBadge">{preview.toUpperCase()}</span></div>
+    <div className="bootScreen branded" style={previewStyle}>
      {f.show_logo&&logoOK&&<img className="bootBrandLogo" src={`/boot/assets/logo?v=${assetVersion}`} onError={()=>setLogoOK(false)}/>}
-     <div className="bootOrg">{f.brand_name||"ReForge"}</div><div className="bootTitle">{f.menu_title||"ReForge Deployment"}</div><div className="bootSubtitle">{f.menu_subtitle}</div>
-     <div className="bootMenu">{visible.map(([id,label])=><div className={"bootMenuItem "+((f.default_item||"deploy")===id?"selected":"")} key={id}><span>{((f.default_item||"deploy")===id)?"›":" "}</span><b>{label}</b><small>{id==="deploy"?(f.require_login?"Credentials required before ISO, Gold and Clone choices":"Open Install / Capture choices"):id==="register"?"Register this device with ReForge":id==="diagnostics"?"Run hardware inventory and diagnostics":"Boot from the local disk"}</small></div>)}</div>
-     <div className="bootFooter">{f.support_text||"IT Support"} · Automatic selection in {Number(f.boot_menu_timeout)||5}s</div>
+     <div className="bootOrg">{f.brand_name||"ReForge"}</div><div className="bootTitle">{screenTitle}</div><div className="bootSubtitle">{screenSubtitle}</div>
+     {preview==="boot"&&<div className="bootMenu">{visible.map(([id,label])=><div className={"bootMenuItem "+((f.default_item||"deploy")===id?"selected":"")} key={id}><span>{((f.default_item||"deploy")===id)?"›":" "}</span><b>{label}</b><small>{id==="deploy"?(f.require_login?"Credentials required before deployment sources are shown":"Open deployment portal"):id==="register"?"Register this device with ReForge":id==="diagnostics"?"Run hardware inventory and diagnostics":"Boot from the local disk"}</small></div>)}</div>}
+     {preview==="install"&&<div className="sourcePreview"><div><Disc3 size={22}/><b>ISO</b><span>Install from original media</span></div><div><HardDrive size={22}/><b>Gold Image</b><span>Deploy standardized image</span></div><div><Copy size={22}/><b>Clone Image</b><span>Restore captured machine image</span></div></div>}
+     {preview==="capture"&&<div className="sourcePreview two"><div><HardDrive size={22}/><b>Capture Gold Image</b><span>Create generalized reusable image</span></div><div><Copy size={22}/><b>Capture Clone Image</b><span>Capture this device or hardware family</span></div></div>}
+     {preview==="loading"&&<div className="loadingPreview"><div className="loadingRing"/><div className="loadingBar"><span/></div><small>Preparing deployment environment...</small></div>}
+     <div className="bootFooter">{f.support_text||"IT Support"}{preview==="boot"?" · Automatic selection in "+String(Number(f.boot_menu_timeout)||5)+"s":""}</div>
     </div>
    </article>
   </section>
