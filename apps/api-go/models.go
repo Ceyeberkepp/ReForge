@@ -105,8 +105,9 @@ type Department struct {
 type Host struct {
 	ID           string     `gorm:"primaryKey" json:"id"`
 	Hostname     string     `gorm:"uniqueIndex;size:160" json:"hostname"`
-	MACAddress   string     `gorm:"uniqueIndex;size:32" json:"mac_address"`
-	SerialNumber string     `json:"serial_number"`
+	MACAddress   *string    `gorm:"uniqueIndex;size:32" json:"mac_address"`
+	HardwareUUID *string    `gorm:"uniqueIndex;size:80" json:"hardware_uuid"`
+	SerialNumber string     `gorm:"index" json:"serial_number"`
 	Manufacturer string     `json:"manufacturer"`
 	Model        string     `json:"model"`
 	DepartmentID *string    `json:"department_id"`
@@ -161,6 +162,15 @@ type PXEConfig struct {
 	ShowLogo        bool   `json:"show_logo"`
 	ShowBackground  bool   `json:"show_background"`
 	RequireLogin    bool   `json:"require_login"`
+	InstallTitle     string `json:"install_title"`
+	InstallSubtitle  string `json:"install_subtitle"`
+	CaptureTitle     string `json:"capture_title"`
+	CaptureSubtitle  string `json:"capture_subtitle"`
+	LoadingTitle     string `json:"loading_title"`
+	LoadingMessage   string `json:"loading_message"`
+	TextColor        string `json:"text_color"`
+	PanelColor       string `json:"panel_color"`
+	OverlayOpacity   int    `json:"overlay_opacity"`
 }
 
 type AuditEvent struct {
