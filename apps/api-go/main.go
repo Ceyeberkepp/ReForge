@@ -45,6 +45,10 @@ func main() {
 	router.Get("/boot/ipxe", app.ipxe)
 	router.Get("/boot/deploy.ipxe", app.deployIPXE)
 	router.Get("/boot/register.ipxe", app.registerIPXE)
+	router.Get("/boot/catalog.ipxe", app.pxeCatalog)
+	router.Get("/boot/sources.ipxe", app.pxeSources)
+	router.Get("/boot/action.ipxe", app.pxeAction)
+	router.Get("/boot/assets/{kind}", app.getBrandingAsset)
 	router.Post("/api/hosts/register", app.registerHost)
 
 	router.Group(func(protected chi.Router) {
@@ -88,6 +92,25 @@ func main() {
 
 		protected.Get("/api/pxe", app.getPXE)
 		protected.Put("/api/pxe", app.savePXE)
+		protected.Post("/api/pxe/assets/{kind}", app.uploadBrandingAsset)
+
+		protected.Get("/api/admin/users", app.listAdminUsers)
+		protected.Post("/api/admin/users", app.saveAdminUser)
+		protected.Put("/api/admin/users/{id}", app.saveAdminUser)
+		protected.Delete("/api/admin/users/{id}", app.deleteAdminUser)
+		protected.Get("/api/admin/groups", app.listGroups)
+		protected.Post("/api/admin/groups", app.saveGroup)
+		protected.Put("/api/admin/groups/{id}", app.saveGroup)
+		protected.Delete("/api/admin/groups/{id}", app.deleteGroup)
+
+		protected.Get("/api/isos", app.listISOs)
+		protected.Post("/api/isos", app.saveISO)
+		protected.Put("/api/isos/{id}", app.saveISO)
+		protected.Delete("/api/isos/{id}", app.deleteISO)
+		protected.Get("/api/clones", app.listClones)
+		protected.Post("/api/clones", app.saveClone)
+		protected.Put("/api/clones/{id}", app.saveClone)
+		protected.Delete("/api/clones/{id}", app.deleteClone)
 
 		protected.Get("/api/audit", app.listAudit)
 	})
