@@ -112,3 +112,58 @@ input[type="file"]{padding:7px;background:#fbfcfd}
 .permissionGrid input{width:auto}
 :root[data-theme="dark"] .permissionGrid label,:root[data-theme="dark"] input[type="file"]{background:#0c1118;border-color:#29333f}
 @media(max-width:1100px){.adminManageGrid{grid-template-columns:1fr}.permissionGrid{grid-template-columns:1fr}.pxeDesignerGrid{grid-template-columns:1fr}}
+
+
+/* ReForge v2 readability and PXE screen designer */
+main{padding:30px 38px 56px}
+.panel{padding:24px 26px}
+.pageHeader h1{font-size:34px}
+.pageHeader p{font-size:15px}
+.sectionHead h3,.panel>h3{font-size:18px}
+.sectionHead p,.panel>p{font-size:13px}
+input,select,textarea{min-height:42px;font-size:13px}
+button{font-size:13px}
+.primary,.secondary{min-height:40px;padding:9px 14px}
+.pipelinePanel{padding:28px 30px;min-height:190px}
+.pipeDot{width:42px;height:42px;font-size:13px}
+.pipeStage b{font-size:13px}.pipeStage span{font-size:11px}
+.dashboardGrid{grid-template-columns:minmax(0,1.8fr) minmax(360px,.9fr);gap:20px}
+.dashboardGrid>.panel{min-height:265px;padding:24px 26px}
+.metricRows>div{padding:18px 0}.metricRows span{font-size:13px}.metricRows b{font-size:24px}
+table th{font-size:11px;padding:12px 10px}table td{font-size:13px;padding:14px 10px}
+.adminTile{min-height:185px;padding:24px}.adminTile h3{font-size:17px}.adminTile p{font-size:13px}
+
+.pxeServicePanel{padding:26px 28px}
+.pxeDesignerGrid{grid-template-columns:minmax(520px,1fr) minmax(520px,1fr);gap:20px}
+.pxeDesignerGrid>.panel{padding:26px 28px}
+.screenTabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:18px 0 20px;padding:5px;border:1px solid #e0e6ed;border-radius:10px;background:#f6f8fa}
+.screenTabs button{border:0;background:transparent;border-radius:7px;padding:10px 8px;color:#667180;font-weight:700}
+.screenTabs button.active{background:#fff;color:#0f6fde;box-shadow:0 1px 3px rgba(20,34,50,.08)}
+.bootScreen{min-height:520px;padding:34px}
+.bootBrandLogo{max-width:240px;max-height:82px;margin-bottom:18px}
+.bootOrg{font-size:14px}.bootTitle{font-size:28px;margin:12px 0 8px}.bootSubtitle{font-size:12px;margin:0 0 24px;max-width:700px}
+.bootMenu{gap:10px}.bootMenuItem{padding:13px 14px;grid-template-columns:20px 1fr}.bootMenuItem b{font-size:14px}.bootMenuItem small{font-size:10px}
+.sourcePreview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
+.sourcePreview.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sourcePreview>div{min-height:138px;border:1px solid rgba(255,255,255,.18);background:rgba(5,15,25,.48);border-radius:9px;padding:18px;display:flex;flex-direction:column;gap:8px}
+.sourcePreview svg{color:var(--pxe-accent,#1473e6)}.sourcePreview b{font-size:14px}.sourcePreview span{font-size:10px;opacity:.72;line-height:1.45}
+.loadingPreview{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;flex:1;min-height:260px}
+.loadingRing{width:58px;height:58px;border-radius:50%;border:5px solid rgba(255,255,255,.15);border-top-color:var(--pxe-accent,#1473e6)}
+.loadingBar{width:min(420px,80%);height:10px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}
+.loadingBar span{display:block;width:58%;height:100%;background:var(--pxe-accent,#1473e6);border-radius:inherit}
+.loadingPreview small{font-size:11px;opacity:.75}
+input[type="range"]{min-height:42px}
+:root[data-theme="dark"] .screenTabs{background:#0c1118;border-color:#29333f}
+:root[data-theme="dark"] .screenTabs button.active{background:#171e28;color:#73aef5}
+
+@media(max-width:1350px){
+ .pxeDesignerGrid{grid-template-columns:1fr}
+ .dashboardGrid{grid-template-columns:1fr}
+ .bootScreen{min-height:440px}
+}
+@media(max-width:900px){
+ main{padding:22px 18px 40px}
+ .panel{padding:20px}
+ .screenTabs{grid-template-columns:repeat(2,1fr)}
+ .sourcePreview,.sourcePreview.two{grid-template-columns:1fr}
+}
