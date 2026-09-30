@@ -205,23 +205,23 @@ func (a *App) pxeCatalog(w http.ResponseWriter,r *http.Request){
 	fmt.Fprintln(w,"choose action && goto ${action}")
 	if perms["pxe.install"]&&perms["pxe.iso"] {
 		fmt.Fprintln(w,":install-iso")
-		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=iso&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=iso&token=%s&mac=${net0/mac}&uuid=${uuid} || goto local\n",a.pxeServerURL(),token)
 	}
 	if perms["pxe.install"]&&perms["pxe.gold"] {
 		fmt.Fprintln(w,":install-gold")
-		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=gold&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=gold&token=%s&mac=${net0/mac}&uuid=${uuid} || goto local\n",a.pxeServerURL(),token)
 	}
 	if perms["pxe.install"]&&perms["pxe.clone"] {
 		fmt.Fprintln(w,":install-clone")
-		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=clone&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+		fmt.Fprintf(w,"chain %s/boot/sources.ipxe?type=clone&token=%s&mac=${net0/mac}&uuid=${uuid} || goto local\n",a.pxeServerURL(),token)
 	}
 	if perms["pxe.capture"]&&perms["pxe.gold"] {
 		fmt.Fprintln(w,":capture-gold")
-		fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=gold&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+		fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=gold&token=%s&mac=${net0/mac}&uuid=${uuid} || goto local\n",a.pxeServerURL(),token)
 	}
 	if perms["pxe.capture"]&&perms["pxe.clone"] {
 		fmt.Fprintln(w,":capture-clone")
-		fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=clone&token=%s&mac=${net0/mac} || goto local\n",a.pxeServerURL(),token)
+		fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=capture&type=clone&token=%s&mac=${net0/mac}&uuid=${uuid} || goto local\n",a.pxeServerURL(),token)
 	}
 	if perms["pxe.diagnostics"] {
 		fmt.Fprintln(w,":diagnostics")
@@ -248,8 +248,16 @@ func (a *App) pxeSources(w http.ResponseWriter,r *http.Request){
 	typ:=r.URL.Query().Get("type")
 	needed:="pxe."+typ
 	if !a.hasPermission(u,"pxe.install")||!a.hasPermission(u,needed){w.WriteHeader(http.StatusForbidden);return}
+	var p PXEConfig
+	a.db.First(&p,"id = ?","default")
+	title:=strings.TrimSpace(p.InstallTitle);if title==""{title="Install operating system"}
+	subtitle:=strings.TrimSpace(p.InstallSubtitle)
 	w.Header().Set("Content-Type","text/plain")
 	fmt.Fprintln(w,"#!ipxe")
+	if p.ShowBackground { fmt.Fprintln(w,"console --picture "+a.pxeServerURL()+"/boot/assets/background ||") }
+	if strings.TrimSpace(p.BrandName)!="" { fmt.Fprintln(w,"echo "+p.BrandName) }
+	fmt.Fprintln(w,"echo "+title)
+	if subtitle!="" { fmt.Fprintln(w,"echo "+subtitle) }
 	fmt.Fprintf(w,"menu Select %s source\n",strings.ToUpper(typ))
 	count:=0
 	switch typ{
@@ -268,15 +276,13 @@ func (a *App) pxeSources(w http.ResponseWriter,r *http.Request){
 	default:
 		w.WriteHeader(http.StatusBadRequest);return
 	}
-	if count==0 {
-		fmt.Fprintln(w,"item none No deployment sources available")
-	}
+	if count==0 { fmt.Fprintln(w,"item none No deployment sources available") }
 	fmt.Fprintln(w,"item cancel Cancel")
 	fmt.Fprintln(w,"choose source && goto selected")
 	fmt.Fprintln(w,":selected")
 	fmt.Fprintln(w,"iseq ${source} cancel && exit ||")
 	fmt.Fprintln(w,"iseq ${source} none && exit ||")
-	fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=install&type=%s&source=${source}&token=%s&mac=${net0/mac} || exit\n",a.pxeServerURL(),typ,token)
+	fmt.Fprintf(w,"chain %s/boot/action.ipxe?action=install&type=%s&source=${source}&token=%s&mac=${net0/mac}&uuid=${uuid} || exit\n",a.pxeServerURL(),typ,token)
 }
 
 func (a *App) pxeAction(w http.ResponseWriter,r *http.Request){
@@ -288,17 +294,35 @@ func (a *App) pxeAction(w http.ResponseWriter,r *http.Request){
 	if action=="install"&&!a.hasPermission(u,"pxe.install"){w.WriteHeader(http.StatusForbidden);return}
 	if action=="capture"&&!a.hasPermission(u,"pxe.capture"){w.WriteHeader(http.StatusForbidden);return}
 	if !a.hasPermission(u,"pxe."+typ){w.WriteHeader(http.StatusForbidden);return}
-	mac,err:=normalizeMAC(r.URL.Query().Get("mac"))
-	if err!=nil{w.WriteHeader(http.StatusBadRequest);return}
-	task:=PXETask{ID:uuid.NewString(),HostMAC:mac,Action:action,SourceType:typ,SourceID:source,RequestedBy:u.Username,Status:"queued",CreatedAt:time.Now().UTC()}
+	macRaw:=strings.TrimSpace(r.URL.Query().Get("mac"))
+	uuidRaw:=strings.TrimSpace(r.URL.Query().Get("uuid"))
+	mac:=""
+	if macRaw!="" {
+		if normalized,err:=normalizeMAC(macRaw);err==nil { mac=normalized }
+	}
+	if mac==""&&uuidRaw==""{w.WriteHeader(http.StatusBadRequest);return}
+	task:=PXETask{ID:uuid.NewString(),HostMAC:mac,HostUUID:uuidRaw,Action:action,SourceType:typ,SourceID:source,RequestedBy:u.Username,Status:"queued",CreatedAt:time.Now().UTC()}
 	if a.db.Create(&task).Error!=nil{w.WriteHeader(http.StatusInternalServerError);return}
 	a.audit(r,"queue-"+action,"pxe-task",task.ID,true,typ)
+	var p PXEConfig
+	a.db.First(&p,"id = ?","default")
 	w.Header().Set("Content-Type","text/plain")
 	fmt.Fprintln(w,"#!ipxe")
-	fmt.Fprintln(w,"echo ReForge task queued")
+	if p.ShowBackground { fmt.Fprintln(w,"console --picture "+a.pxeServerURL()+"/boot/assets/background ||") }
+	if strings.TrimSpace(p.BrandName)!="" { fmt.Fprintln(w,"echo "+p.BrandName) }
+	if action=="capture" {
+		title:=strings.TrimSpace(p.CaptureTitle);if title==""{title="Capture image"}
+		fmt.Fprintln(w,"echo "+title)
+		if strings.TrimSpace(p.CaptureSubtitle)!="" { fmt.Fprintln(w,"echo "+p.CaptureSubtitle) }
+	} else {
+		title:=strings.TrimSpace(p.LoadingTitle);if title==""{title="ReForge is preparing this device"}
+		fmt.Fprintln(w,"echo "+title)
+		if strings.TrimSpace(p.LoadingMessage)!="" { fmt.Fprintln(w,"echo "+p.LoadingMessage) }
+	}
+	fmt.Fprintln(w,"echo")
 	fmt.Fprintln(w,"echo Task: "+task.ID)
 	fmt.Fprintln(w,"echo Requested by: "+u.Username)
-	fmt.Fprintln(w,"echo Imaging node handoff required")
+	fmt.Fprintln(w,"echo Waiting for authorized imaging node...")
 	fmt.Fprintln(w,"sleep 3")
 	fmt.Fprintln(w,"exit")
 }
