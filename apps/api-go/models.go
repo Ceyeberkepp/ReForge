@@ -244,6 +244,13 @@ type PXETask struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type PXEAccessToken struct {
+	Token     string    `gorm:"primaryKey;size:96" json:"-"`
+	UserID    string    `gorm:"index" json:"user_id"`
+	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Session struct {
 	Token     string `gorm:"primaryKey;size:96"`
 	UserID    string `gorm:"index"`
@@ -320,7 +327,7 @@ func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&GoldImage{}, &SoftwarePackage{}, &Department{}, &Host{},
 		&DirectoryConfig{}, &DeploymentJob{}, &PXEConfig{},
-		&AuditEvent{}, &User{}, &UserGroup{}, &ISOImage{}, &CloneImage{}, &BrandingAsset{}, &PXETask{}, &Session{},
+		&AuditEvent{}, &User{}, &UserGroup{}, &ISOImage{}, &CloneImage{}, &BrandingAsset{}, &PXETask{}, &PXEAccessToken{}, &Session{},
 	)
 }
 
