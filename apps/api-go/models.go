@@ -148,6 +148,12 @@ type PXEConfig struct {
 	NextServer      string `json:"next_server"`
 	BootMenuTimeout int    `json:"boot_menu_timeout"`
 	AllowUnknown    bool   `json:"allow_unknown"`
+	MenuTitle       string `json:"menu_title"`
+	DefaultItem     string `json:"default_item"`
+	ShowDeploy      bool   `json:"show_deploy"`
+	ShowRegister    bool   `json:"show_register"`
+	ShowDiagnostics bool   `json:"show_diagnostics"`
+	ShowLocalBoot   bool   `json:"show_local_boot"`
 }
 
 type AuditEvent struct {
