@@ -660,14 +660,6 @@ func firstPXEMenuItem(p PXEConfig) string {
 	return "local"
 }
 
-func firstPXEMenuItem(p PXEConfig) string {
-	if p.ShowDeploy { return "deploy" }
-	if p.ShowRegister { return "register" }
-	if p.ShowDiagnostics { return "diagnostics" }
-	if p.ShowLocalBoot { return "local" }
-	return "local"
-}
-
 func pxeAuthCatalogURL(base string) string {
 	base = strings.TrimRight(base, "/")
 	if strings.HasPrefix(base, "https://") {
