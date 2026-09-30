@@ -154,6 +154,13 @@ type PXEConfig struct {
 	ShowRegister    bool   `json:"show_register"`
 	ShowDiagnostics bool   `json:"show_diagnostics"`
 	ShowLocalBoot   bool   `json:"show_local_boot"`
+	BrandName       string `json:"brand_name"`
+	MenuSubtitle    string `json:"menu_subtitle"`
+	SupportText     string `json:"support_text"`
+	AccentColor     string `json:"accent_color"`
+	ShowLogo        bool   `json:"show_logo"`
+	ShowBackground  bool   `json:"show_background"`
+	RequireLogin    bool   `json:"require_login"`
 }
 
 type AuditEvent struct {
@@ -169,12 +176,61 @@ type AuditEvent struct {
 }
 
 type User struct {
-	ID           string `gorm:"primaryKey"`
-	Username     string `gorm:"uniqueIndex;size:120"`
-	PasswordHash string
-	Role         string `gorm:"size:40"`
-	Disabled     bool
-	CreatedAt    time.Time
+	ID           string    `gorm:"primaryKey" json:"id"`
+	Username     string    `gorm:"uniqueIndex;size:120" json:"username"`
+	PasswordHash string    `json:"-"`
+	Role         string    `gorm:"size:40" json:"role"`
+	GroupID      *string   `gorm:"index" json:"group_id"`
+	Disabled     bool      `json:"disabled"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type UserGroup struct {
+	ID          string   `gorm:"primaryKey" json:"id"`
+	Name        string   `gorm:"uniqueIndex;size:120" json:"name"`
+	Description string   `json:"description"`
+	Permissions JSONList `gorm:"type:text" json:"-"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type UserGroupDTO struct {
+	ID          string   `json:"id,omitempty"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Permissions []string `json:"permissions"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
+}
+
+type ISOImage struct {
+	ID           string    `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"uniqueIndex;size:160" json:"name"`
+	OSFamily     string    `json:"os_family"`
+	Version      string    `json:"version"`
+	Architecture string    `json:"architecture"`
+	SourcePath   string    `json:"source_path"`
+	Checksum     string    `json:"checksum"`
+	Enabled      bool      `json:"enabled"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type CloneImage struct {
+	ID             string    `gorm:"primaryKey" json:"id"`
+	Name           string    `gorm:"uniqueIndex;size:160" json:"name"`
+	SourceHostID   *string   `gorm:"index" json:"source_host_id"`
+	OSFamily       string    `json:"os_family"`
+	Architecture   string    `json:"architecture"`
+	HardwareFamily string    `json:"hardware_family"`
+	ImagePath      string    `json:"image_path"`
+	Checksum       string    `json:"checksum"`
+	Enabled        bool      `json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type BrandingAsset struct {
+	ID          string    `gorm:"primaryKey;size:32" json:"id"`
+	ContentType string    `json:"content_type"`
+	Data        []byte    `gorm:"type:blob" json:"-"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type Session struct {
@@ -253,7 +309,7 @@ func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&GoldImage{}, &SoftwarePackage{}, &Department{}, &Host{},
 		&DirectoryConfig{}, &DeploymentJob{}, &PXEConfig{},
-		&AuditEvent{}, &User{}, &Session{},
+		&AuditEvent{}, &User{}, &UserGroup{}, &ISOImage{}, &CloneImage{}, &BrandingAsset{}, &Session{},
 	)
 }
 
