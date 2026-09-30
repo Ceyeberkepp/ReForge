@@ -210,10 +210,10 @@ chmod 600 .env
 
 if [[ "${DB_CHOICE}" == "3" ]]; then
   echo "Starting Microsoft SQL Server..."
-  docker compose -f infra/docker-compose.yml --profile sqlserver up -d sqlserver
+  docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml --profile sqlserver up -d sqlserver
   echo "Waiting for SQL Server..."
   for _ in $(seq 1 45); do
-    if docker compose -f infra/docker-compose.yml exec -T sqlserver bash -lc '
+    if docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml exec -T sqlserver bash -lc '
       SQLCMD=""
       [[ -x /opt/mssql-tools18/bin/sqlcmd ]] && SQLCMD=/opt/mssql-tools18/bin/sqlcmd
       [[ -z "$SQLCMD" && -x /opt/mssql-tools/bin/sqlcmd ]] && SQLCMD=/opt/mssql-tools/bin/sqlcmd
@@ -226,10 +226,10 @@ if [[ "${DB_CHOICE}" == "3" ]]; then
 fi
 
 echo "[5/6] Building and starting ReForge..."
-docker compose -f infra/docker-compose.yml up -d --build
+docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml up -d --build
 
 echo "[6/6] Verifying ReForge services..."
-docker compose -f infra/docker-compose.yml ps
+docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml ps
 
 echo
 echo "ReForge installation started successfully."
