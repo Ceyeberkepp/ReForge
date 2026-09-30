@@ -246,6 +246,7 @@ type BrandingAsset struct {
 type PXETask struct {
 	ID          string    `gorm:"primaryKey" json:"id"`
 	HostMAC     string    `gorm:"index;size:32" json:"host_mac"`
+	HostUUID    string    `gorm:"index;size:80" json:"host_uuid"`
 	Action      string    `gorm:"index;size:32" json:"action"`
 	SourceType  string    `gorm:"index;size:32" json:"source_type"`
 	SourceID    string    `gorm:"index" json:"source_id"`
