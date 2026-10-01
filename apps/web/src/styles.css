@@ -189,3 +189,7 @@ input[type="range"]{min-height:42px}
 :root[data-theme="dark"] .uploadTrack{background:#222b36}
 @media(max-width:1350px){.dashboardLower{grid-template-columns:1fr}.contentMetrics{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.contentMetrics,.quickActions{grid-template-columns:1fr}}
+
+.securityNote{display:flex;align-items:flex-start;gap:9px;border:1px solid #cfe1f6;background:#f3f8fe;border-radius:9px;padding:11px 12px;color:#34516f}
+.securityNote svg{color:#0f6fde;flex:none;margin-top:1px}.securityNote b,.securityNote small{display:block}.securityNote b{font-size:11px}.securityNote small{font-size:10px;line-height:1.4;margin-top:2px;color:#60758c}
+:root[data-theme="dark"] .securityNote{background:#0e1925;border-color:#233d57;color:#c8ddf3}
