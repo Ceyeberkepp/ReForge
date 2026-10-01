@@ -22,6 +22,7 @@ type Config struct {
 	AllowedOrigin      string
 	WorkerToken        string
 	AllowInsecureLDAP  bool
+	ContentRoot        string
 }
 
 func env(k, d string) string {
@@ -41,6 +42,7 @@ func loadConfig() Config {
 		AllowedOrigin:     env("REFORGE_ALLOWED_ORIGIN", "http://localhost:5173"),
 		WorkerToken:       env("REFORGE_WORKER_TOKEN", ""),
 		AllowInsecureLDAP: strings.EqualFold(env("REFORGE_ALLOW_INSECURE_LDAP", "false"), "true"),
+		ContentRoot:       env("REFORGE_CONTENT_ROOT", "/var/lib/reforge/content"),
 	}
 }
 
@@ -87,6 +89,21 @@ type SoftwarePackage struct {
 	UninstallCommand  string `json:"uninstall_command"`
 	InstallOrder      int    `json:"install_order"`
 	RequiredByDefault bool   `json:"required_by_default"`
+}
+
+type DriverPack struct {
+	ID           string    `gorm:"primaryKey" json:"id"`
+	Name         string    `gorm:"index;size:160" json:"name"`
+	Vendor       string    `gorm:"index;size:120" json:"vendor"`
+	Model        string    `gorm:"index;size:160" json:"model"`
+	OSName       string    `gorm:"index;size:120" json:"os_name"`
+	OSVersion    string    `json:"os_version"`
+	Architecture string    `json:"architecture"`
+	Version      string    `json:"version"`
+	PackagePath  string    `json:"package_path"`
+	Checksum     string    `json:"checksum"`
+	Enabled      bool      `json:"enabled"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type Department struct {
@@ -336,7 +353,7 @@ func openDB(c Config) (*gorm.DB, error) {
 
 func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&GoldImage{}, &SoftwarePackage{}, &Department{}, &Host{},
+		&GoldImage{}, &SoftwarePackage{}, &DriverPack{}, &Department{}, &Host{},
 		&DirectoryConfig{}, &DeploymentJob{}, &PXEConfig{},
 		&AuditEvent{}, &User{}, &UserGroup{}, &ISOImage{}, &CloneImage{}, &BrandingAsset{}, &PXETask{}, &PXEAccessToken{}, &Session{},
 	)
