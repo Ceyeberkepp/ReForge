@@ -2,6 +2,11 @@
 
 ReForge is a modern endpoint imaging, reimaging, PXE deployment and device-management platform. It combines the deployment workflow people remember from Microsoft WDS/MDT with FOG-style flexibility and a cleaner administration experience.
 
+## Support and knowledge base
+
+- **[ReForge Support Guide](docs/REFORGE-SUPPORT-GUIDE.md)** — installation, updates, architecture, PXE, content storage, RBAC, directory services, logs, and support triage.
+- **[ReForge Knowledge Base](docs/kb/README.md)** — step-by-step articles for web access, PXE/DHCP, PXE authentication, content uploads, imaging workflows, host identity, directory services, database/container troubleshooting, and support-data collection.
+
 ## Architecture
 
 - **Go 1.27 control plane** — REST API, authentication, audit events, PXE menu generation, configuration and orchestration
