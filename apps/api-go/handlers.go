@@ -680,6 +680,7 @@ func (a *App) savePXE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row.ID = "default"
+	row.RequireLogin = true
 	if row.BootMenuTimeout < 1 { row.BootMenuTimeout = 5 }
 	if strings.TrimSpace(row.MenuTitle) == "" { row.MenuTitle = "ReForge Deployment" }
 	if strings.TrimSpace(row.BrandName) == "" { row.BrandName = "ReForge" }
