@@ -70,6 +70,9 @@ services:
       REFORGE_ALLOWED_ORIGIN: ${REFORGE_ALLOWED_ORIGIN}
       REFORGE_WORKER_TOKEN: ${REFORGE_WORKER_TOKEN}
       REFORGE_ALLOW_INSECURE_LDAP: "false"
+      REFORGE_CONTENT_ROOT: /var/lib/reforge/content
+    volumes:
+      - reforge-content:/var/lib/reforge/content
     expose:
       - "8080"
     restart: unless-stopped
@@ -112,3 +115,4 @@ volumes:
   reforge-sqlserver:
   reforge-mongodb:
   reforge-neo4j:
+  reforge-content:
