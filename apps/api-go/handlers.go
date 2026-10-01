@@ -97,7 +97,8 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	a.db.Model(&DeploymentJob{}).Where("status = ?", "running").Count(&running)
 	a.db.Model(&DeploymentJob{}).Where("status = ?", "waiting").Count(&waiting)
 	writeJSON(w, 200, map[string]any{
-		"images": count(&GoldImage{}), "departments": count(&Department{}),
+		"images": count(&GoldImage{}), "isos": count(&ISOImage{}), "clones": count(&CloneImage{}),
+		"drivers": count(&DriverPack{}), "departments": count(&Department{}),
 		"software": count(&SoftwarePackage{}), "hosts": count(&Host{}),
 		"queued_deployments": queued, "running_deployments": running, "waiting_deployments": waiting,
 	})
