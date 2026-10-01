@@ -64,6 +64,7 @@ func main() {
 		protected.Post("/api/images", app.saveImage)
 		protected.Put("/api/images/{id}", app.saveImage)
 		protected.Delete("/api/images/{id}", app.deleteImage)
+		protected.Post("/api/images/{id}/file", app.uploadGoldImage)
 
 		protected.Get("/api/departments", app.listDepartments)
 		protected.Post("/api/departments", app.saveDepartment)
@@ -75,6 +76,7 @@ func main() {
 		protected.Put("/api/software/{id}", app.saveSoftware)
 		protected.Delete("/api/software/{id}", app.deleteSoftware)
 		protected.Post("/api/software/bootstrap", app.bootstrapSoftware)
+		protected.Post("/api/software/{id}/file", app.uploadSoftware)
 
 		protected.Get("/api/hosts", app.listHosts)
 		protected.Post("/api/hosts", app.saveHost)
@@ -107,6 +109,12 @@ func main() {
 		protected.Post("/api/isos", app.saveISO)
 		protected.Put("/api/isos/{id}", app.saveISO)
 		protected.Delete("/api/isos/{id}", app.deleteISO)
+		protected.Post("/api/isos/{id}/file", app.uploadISO)
+		protected.Get("/api/drivers", app.listDrivers)
+		protected.Post("/api/drivers", app.saveDriver)
+		protected.Put("/api/drivers/{id}", app.saveDriver)
+		protected.Delete("/api/drivers/{id}", app.deleteDriver)
+		protected.Post("/api/drivers/{id}/file", app.uploadDriver)
 		protected.Get("/api/clones", app.listClones)
 		protected.Post("/api/clones", app.saveClone)
 		protected.Put("/api/clones/{id}", app.saveClone)
@@ -126,8 +134,8 @@ func main() {
 		Addr:              cfg.Listen,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		ReadTimeout:       0,
+		WriteTimeout:      0,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
