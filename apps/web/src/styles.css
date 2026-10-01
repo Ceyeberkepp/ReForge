@@ -167,3 +167,25 @@ input[type="range"]{min-height:42px}
  .screenTabs{grid-template-columns:repeat(2,1fr)}
  .sourcePreview,.sourcePreview.two{grid-template-columns:1fr}
 }
+
+
+/* Dashboard density and deployment-content uploads */
+.dashboardLower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin-top:20px}
+.dashboardLower>.panel{min-height:250px}
+.contentMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+.contentMetrics button{border:1px solid #e2e7ee;background:#fbfcfd;border-radius:9px;padding:18px 16px;text-align:left;color:#334155;display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:8px}
+.contentMetrics button:hover{background:#f3f7fb;border-color:#cfd9e5}
+.contentMetrics button svg{color:#0f6fde}.contentMetrics button span{font-size:12px}.contentMetrics button b{font-size:22px;color:#111827}
+.quickActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
+.quickActions button{border:1px solid #e2e7ee;background:#fff;border-radius:9px;padding:14px;text-align:left;display:flex;align-items:flex-start;gap:11px;color:#334155}
+.quickActions button:hover{background:#f6f9fc;border-color:#cbd7e5}.quickActions button svg{color:#0f6fde;margin-top:2px;flex:none}
+.quickActions b,.quickActions small{display:block}.quickActions b{font-size:12px}.quickActions small{font-size:10px;color:#748091;margin-top:3px;line-height:1.35}
+.uploadStatus{border:1px solid #dbe3ec;border-radius:9px;padding:12px 14px;background:#f8fafc}
+.uploadStatus>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#5e6978;margin-bottom:8px}
+.uploadStatus b{color:#0f6fde}.uploadTrack{height:9px;border-radius:999px;background:#e7ecf2;overflow:hidden}.uploadTrack span{display:block;height:100%;background:#0f6fde;border-radius:inherit;transition:width .15s ease}
+.contentReady{display:inline-flex;align-items:center;gap:5px;color:#16814a;font-weight:700;font-size:11px}.contentPath{word-break:break-all}
+:root[data-theme="dark"] .contentMetrics button,:root[data-theme="dark"] .quickActions button,:root[data-theme="dark"] .uploadStatus{background:#0c1118;border-color:#29333f;color:#d9e2ec}
+:root[data-theme="dark"] .contentMetrics button b{color:#f3f6fb}
+:root[data-theme="dark"] .uploadTrack{background:#222b36}
+@media(max-width:1350px){.dashboardLower{grid-template-columns:1fr}.contentMetrics{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.contentMetrics,.quickActions{grid-template-columns:1fr}}
