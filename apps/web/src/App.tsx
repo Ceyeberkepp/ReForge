@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Boxes, Building2, Computer, HardDrive, LayoutDashboard, Package, Rocket, Settings, ShieldCheck, Plus, Trash2, RefreshCw, Play, CheckCircle2, XCircle, Loader2, Network, Database, ClipboardList, KeyRound, Search, Bell, HelpCircle, Sun, Moon, Monitor, Disc3, Copy, ListChecks, Wrench, BarChart3, UserCog, Apple, LogOut, Activity, Server } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
-type Stats={images:number;departments:number;software:number;hosts:number;queued_deployments:number;running_deployments?:number};
+type Stats={images:number;isos?:number;clones?:number;drivers?:number;departments:number;software:number;hosts:number;queued_deployments:number;running_deployments?:number;waiting_deployments?:number};
 type Img={id:string;name:string;os_name:string;os_version:string;architecture:string;image_version:string;image_path?:string|null;sysprep_ready:boolean;checksum?:string|null;notes:string};
 type Sw={id:string;name:string;version:string;installer_path:string;silent_install:string;detection_rule:string;uninstall_command:string;install_order:number;required_by_default:boolean};
 type Dept={id:string;name:string;code:string;image_id?:string|null;computer_name_pattern:string;ad_ou:string;required_software_ids:string[];optional_software_ids:string[];printers:string[];post_install_scripts:string[];config:any};
@@ -13,6 +13,7 @@ type ISOItem={id:string;name:string;os_family:string;version:string;architecture
 type CloneItem={id:string;name:string;source_host_id?:string|null;os_family:string;architecture:string;hardware_family:string;image_path:string;checksum:string;enabled:boolean;created_at?:string};
 type AdminUser={id:string;username:string;role:string;group_id?:string|null;disabled:boolean;created_at?:string};
 type Group={id:string;name:string;description:string;permissions:string[];created_at?:string};
+type DriverItem={id:string;name:string;vendor:string;model:string;os_name:string;os_version:string;architecture:string;version:string;package_path:string;checksum:string;enabled:boolean;created_at?:string};
 
 const navGroups=[
   {label:"",items:[["Dashboard",LayoutDashboard]]},
@@ -23,6 +24,7 @@ const navGroups=[
   {label:"System",items:[["Admin Center",UserCog],["Settings",Settings]]}
 ] as const;
 async function req(path:string,init?:RequestInit){const r=await fetch(API+path,{...init,credentials:"include",headers:{"Content-Type":"application/json",...(init?.headers||{})}});if(!r.ok){let m=r.status+" "+r.statusText;try{const b=await r.json();m=b.detail||b.message||m}catch{}throw new Error(m)}return r.status===204?null:r.json()}
+function uploadFile(path:string,file:File,onProgress?:(n:number)=>void){return new Promise<any>((resolve,reject)=>{const x=new XMLHttpRequest();x.open("POST",API+path);x.withCredentials=true;x.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(Math.round((e.loaded/e.total)*100))};x.onload=()=>{let body:any={};try{body=JSON.parse(x.responseText||"{}")}catch{}if(x.status>=200&&x.status<300)resolve(body);else reject(new Error(body.detail||("Upload failed: "+x.status)))};x.onerror=()=>reject(new Error("Upload failed"));const form=new FormData();form.append("file",file);x.send(form)})}
 const img0={name:"",os_name:"Windows 11 Enterprise",os_version:"",architecture:"x86_64",image_version:"1.0",image_path:"",sysprep_ready:false,checksum:"",notes:""};
 const sw0={name:"",version:"",installer_path:"",silent_install:"",detection_rule:"",uninstall_command:"",install_order:100,required_by_default:false};
 const host0={hostname:"",mac_address:"",hardware_uuid:"",serial_number:"",manufacturer:"",model:"",department_id:""};
@@ -36,7 +38,7 @@ export function App(){
  useEffect(()=>{req("/api/auth/me").then(()=>{setAuth(true);refresh()}).catch(()=>setAuth(false))},[]);
  useEffect(()=>{if(!auth)return;const t=setInterval(()=>refresh(true),4000);return()=>clearInterval(t)},[auth]);
  useEffect(()=>{localStorage.setItem("reforge-theme",theme);document.documentElement.dataset.theme=theme},[theme]);
- let page:any=<Dashboard stats={stats} jobs={jobs} hosts={hosts} images={images}/>;
+ let page:any=<Dashboard stats={stats} jobs={jobs} hosts={hosts} images={images} go={setActive}/>;
  if(active==="Gold Images")page=<Images items={images} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Applications")page=<Software items={software} changed={refresh} err={setError} note={setNotice}/>;
  if(active==="Departments")page=<Departments items={departments} images={images} software={software} changed={refresh} err={setError} note={setNotice}/>;
@@ -50,7 +52,7 @@ export function App(){
  if(active==="Clone Images")page=<CloneImages hosts={hosts}/>;
  if(active==="macOS Installers")page=<ModulePage icon={Apple} title="macOS Provisioning" description="Manage macOS installers, packages, profiles and supported Apple provisioning workflows." action="Add installer" bullets={["Intel and Apple Silicon inventory","PKG and configuration profiles","Apple enrollment integration"]}/>;
  if(active==="Task Sequences")page=<ModulePage icon={ListChecks} title="Task Sequences" description="Build ordered deployment workflows for imaging, drivers, applications, directory join, updates and validation." action="New task sequence" bullets={["Conditional deployment steps","Retries and timeouts","Windows, Linux and macOS filters"]}/>;
- if(active==="Drivers")page=<ModulePage icon={Wrench} title="Driver Packs" description="Organize driver packs by manufacturer, model, operating system and architecture." action="Add driver pack" bullets={["Model matching","Offline Windows injection","Versioned driver packs"]}/>;
+ if(active==="Drivers")page=<Drivers/>;
  if(active==="Reports")page=<ModulePage icon={BarChart3} title="Reports" description="Deployment, image, host, driver and imaging-node operational reporting." action="Create report" bullets={["Deployment success and duration","Image usage and age","Hardware and OS inventory"]}/>;
  if(active==="Admin Center")page=<AdminCenter go={setActive}/>;
  if(active==="Imaging Nodes")page=<ModulePage icon={Server} title="Imaging Nodes" description="Register and monitor privileged capture and restore workers." action="Register imaging node" bullets={["Signed deployment authorization","Node health and workload state","PXE imaging environment handoff"]}/>;
@@ -82,14 +84,26 @@ export function App(){
  </div>
 }
 
-function Dashboard(p:{stats:Stats;jobs:Job[];hosts:Host[];images:Img[]}){
+function Dashboard(p:{stats:Stats;jobs:Job[];hosts:Host[];images:Img[];go:(page:string)=>void}){
  const recent=p.jobs.slice(0,5);
+ const quick=[
+  ["Gold Images",HardDrive,"Upload or manage standardized images"],
+  ["ISO Library",Disc3,"Upload Windows, Linux or recovery ISO"],
+  ["Drivers",Wrench,"Upload model-specific driver packs"],
+  ["Applications",Package,"Upload installers and deployment commands"],
+  ["Hosts (PXE)",Computer,"Register and manage PXE devices"],
+  ["PXE / Network",Network,"Configure boot menus and network"]
+ ] as const;
  return <div className="dashboardV2">
   <section className="systemStrip"><div className="serverIdentity"><div className="serverIcon"><Server size={21}/></div><div><b>ReForge Server</b><span>Deployment control plane</span></div></div><div className="systemReady"><span className="statusDot"/><div><b>System Ready</b><span>API and database available</span></div></div></section>
-  <section className="panel pipelinePanel"><div className="sectionHead"><div><h3>Deployment Pipeline</h3><p>Step-by-step workflow for deploying systems.</p></div><button className="primary"><Play size={16}/> Start Deployment</button></div><div className="pipelineFlow">{["PXE Boot","Select Source","Drivers","Join Directory","Applications","Complete"].map((x,i)=><div className="pipeStage" key={x}><div className={i<2?"pipeDot done":"pipeDot"}>{i<2?<CheckCircle2 size={18}/>:i+1}</div><b>{x}</b><span>{["Boot device from network","ISO, gold or clone image","Inject matching drivers","AD / Entra placement","Install software and updates","Validate and hand off"][i]}</span></div>)}</div></section>
+  <section className="panel pipelinePanel"><div className="sectionHead"><div><h3>Deployment Pipeline</h3><p>Step-by-step workflow for deploying systems.</p></div><button className="primary" onClick={()=>p.go("Deployments")}><Play size={16}/> Start Deployment</button></div><div className="pipelineFlow">{["PXE Boot","Select Source","Drivers","Join Directory","Applications","Complete"].map((x,i)=><div className="pipeStage" key={x}><div className={i<2?"pipeDot done":"pipeDot"}>{i<2?<CheckCircle2 size={18}/>:i+1}</div><b>{x}</b><span>{["Boot device from network","ISO, gold or clone image","Inject matching drivers","AD / Entra placement","Install software and updates","Validate and hand off"][i]}</span></div>)}</div></section>
   <section className="dashboardGrid">
-   <article className="panel"><div className="sectionHead"><div><h3>Live Queue</h3><p>Active and recent deployments.</p></div><span className="linkText">{p.stats.queued_deployments} queued · {p.stats.running_deployments||0} running</span></div><table><thead><tr><th>Device</th><th>Image</th><th>Stage</th><th>Progress</th></tr></thead><tbody>{recent.map(j=><tr key={j.id}><td><b>{p.hosts.find(h=>h.id===j.host_id)?.hostname||j.host_id.slice(0,8)}</b></td><td>{p.images.find(i=>i.id===j.image_id)?.name||"Unassigned"}</td><td><Status v={j.status}/></td><td><Progress v={j.progress}/></td></tr>)}{!recent.length&&<Empty cols={4}/>}</tbody></table></article>
+   <article className="panel"><div className="sectionHead"><div><h3>Live Queue</h3><p>Active and recent deployments.</p></div><span className="linkText">{p.stats.queued_deployments} queued · {p.stats.running_deployments||0} running · {p.stats.waiting_deployments||0} waiting</span></div><table><thead><tr><th>Device</th><th>Image</th><th>Stage</th><th>Progress</th></tr></thead><tbody>{recent.map(j=><tr key={j.id}><td><b>{p.hosts.find(h=>h.id===j.host_id)?.hostname||j.host_id.slice(0,8)}</b></td><td>{p.images.find(i=>i.id===j.image_id)?.name||"Unassigned"}</td><td><Status v={j.status}/></td><td><Progress v={j.progress}/></td></tr>)}{!recent.length&&<Empty cols={4}/>}</tbody></table></article>
    <article className="panel activityPanel"><div className="sectionHead"><div><h3>Environment</h3><p>Managed resources.</p></div></div><div className="metricRows"><div><HardDrive size={18}/><span>Gold Images</span><b>{p.stats.images}</b></div><div><Computer size={18}/><span>Managed Hosts</span><b>{p.stats.hosts}</b></div><div><Building2 size={18}/><span>Departments</span><b>{p.stats.departments}</b></div><div><Package size={18}/><span>Applications</span><b>{p.stats.software}</b></div></div></article>
+  </section>
+  <section className="dashboardLower">
+   <article className="panel"><div className="sectionHead"><div><h3>Content Library</h3><p>Deployment content available to ReForge.</p></div></div><div className="contentMetrics"><button onClick={()=>p.go("Gold Images")}><HardDrive size={20}/><span>Gold Images</span><b>{p.stats.images}</b></button><button onClick={()=>p.go("ISO Library")}><Disc3 size={20}/><span>ISOs</span><b>{p.stats.isos||0}</b></button><button onClick={()=>p.go("Clone Images")}><Copy size={20}/><span>Clone Images</span><b>{p.stats.clones||0}</b></button><button onClick={()=>p.go("Drivers")}><Wrench size={20}/><span>Driver Packs</span><b>{p.stats.drivers||0}</b></button></div></article>
+   <article className="panel"><div className="sectionHead"><div><h3>Quick Actions</h3><p>Common administrator tasks.</p></div></div><div className="quickActions">{quick.map(([page,I,desc])=><button key={page} onClick={()=>p.go(page)}><I size={18}/><span><b>{page}</b><small>{desc}</small></span></button>)}</div></article>
   </section>
  </div>
 }
