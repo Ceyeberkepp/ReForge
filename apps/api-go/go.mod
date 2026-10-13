@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/go-chi/chi/v5 v5.3.2
-	github.com/go-ldap/ldap/v3 v3.4.14
+	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/google/uuid v1.6.0
 	golang.org/x/crypto v0.57.0
 	gorm.io/driver/mysql v1.6.0
