@@ -122,6 +122,29 @@ HOST_IP="${HOST_IP:-127.0.0.1}"
 
 echo
 echo "[4/6] Configuring ReForge..."
+# Existing installations must NEVER rotate generated secrets or database passwords.
+if [[ -f .env ]]; then
+  echo "Existing ReForge installation detected; preserving .env credentials."
+  if ! grep -q '^REFORGE_WORKER_TOKEN=' .env || ! grep -q '^REFORGE_DB_DSN=' .env; then
+    echo "Existing .env is incomplete; refusing to overwrite it." >&2
+    exit 1
+  fi
+  if ! grep -q '^REFORGE_WEB_PORT=' .env; then
+    echo "REFORGE_WEB_PORT=5173" >>.env
+  fi
+  ADMINPASS=""
+else
+  # On fresh installs select an unused host port; preserve the choice on upgrades.
+  WEB_PORT="${REFORGE_WEB_PORT:-5173}"
+  if ! [[ "${WEB_PORT}" =~ ^[0-9]+$ ]] || (( WEB_PORT < 1024 || WEB_PORT > 65535 )); then
+    echo "REFORGE_WEB_PORT must be an integer from 1024 to 65535." >&2
+    exit 1
+  fi
+  while ss -H -ltn "sport = :${WEB_PORT}" 2>/dev/null | grep -q .; do
+    (( WEB_PORT < 65535 )) || { echo "No free ReForge web port found." >&2; exit 1; }
+    WEB_PORT=$((WEB_PORT + 1))
+  done
+  echo "Selected web port: ${WEB_PORT}"
 echo
 echo "ReForge database"
 echo "  1) PostgreSQL (recommended)"
@@ -203,7 +226,8 @@ NEO4J_AUTH=neo4j/${NEO4JPASS}
 REFORGE_ADMIN_USER=admin
 REFORGE_ADMIN_PASSWORD=${ADMINPASS}
 REFORGE_WORKER_TOKEN=${WORKERTOKEN}
-REFORGE_ALLOWED_ORIGIN=http://${HOST_IP}:5173
+REFORGE_ALLOWED_ORIGIN=http://${HOST_IP}:${WEB_PORT}
+REFORGE_WEB_PORT=${WEB_PORT}
 VITE_API_URL=
 EOF
 chmod 600 .env
@@ -224,6 +248,7 @@ if [[ "${DB_CHOICE}" == "3" ]]; then
     sleep 2
   done
 fi
+fi
 
 echo "[5/6] Building and starting ReForge..."
 docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml up -d --build
@@ -232,13 +257,18 @@ echo "[6/6] Verifying ReForge services..."
 docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml ps
 
 echo
-echo "ReForge installation started successfully."
-echo "Web UI: http://${HOST_IP}:5173"
+echo "ReForge services started. Check the health output above before production use."
+WEB_PORT="$(sed -n 's/^REFORGE_WEB_PORT=//p' .env | tail -n 1)"
+WEB_PORT="${WEB_PORT:-5173}"
+echo "Web UI: http://${HOST_IP}:${WEB_PORT}"
 echo
-echo "Initial administrator:"
-echo "  Username: admin"
-echo "  Password: ${ADMINPASS}"
-echo
-echo "Save the password now. Change it after first sign-in."
+if [[ -n "${ADMINPASS}" ]]; then
+  echo "Initial administrator:"
+  echo "  Username: admin"
+  echo "  Password: ${ADMINPASS}"
+  echo "Save the password now. Change it after first sign-in."
+else
+  echo "Existing administrator credentials were preserved (not printed or reset)."
+fi
 echo
 echo "PXE configuration is available inside the web UI under PXE / Network."
