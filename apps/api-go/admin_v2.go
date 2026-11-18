@@ -268,7 +268,10 @@ func (a *App) pxeSources(w http.ResponseWriter,r *http.Request){
 	case "gold":
 		var rows []GoldImage
 		a.db.Order("name").Find(&rows)
-		for _,x:=range rows{fmt.Fprintf(w,"item %s %s v%s\n",x.ID,x.Name,x.ImageVersion);count++}
+		for _,x:=range rows{
+			if validateFreshDeploymentImage(x)!=nil { continue }
+			fmt.Fprintf(w,"item %s %s v%s\n",x.ID,x.Name,x.ImageVersion);count++
+		}
 	case "clone":
 		macRaw:=r.URL.Query().Get("mac")
 		mac,err:=normalizeMAC(macRaw)
