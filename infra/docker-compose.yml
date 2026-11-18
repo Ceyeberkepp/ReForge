@@ -102,7 +102,7 @@ services:
     depends_on:
       - api
     ports:
-      - "5173:8080"
+      - "${REFORGE_WEB_PORT:-5173}:8080"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

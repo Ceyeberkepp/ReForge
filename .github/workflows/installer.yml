@@ -1,0 +1,29 @@
+name: installer
+on:
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'infra/docker-compose.yml'
+      - '.github/workflows/installer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'install.sh'
+      - 'infra/docker-compose.yml'
+      - '.github/workflows/installer.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
+        run: bash -n install.sh
+      - name: Compose configuration
+        run: docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
+      - name: Check overridable web port
+        run: |
+          docker compose --env-file .env.example -f infra/docker-compose.yml config > /tmp/reforge-default.yml
+          REFORGE_WEB_PORT=5174 docker compose --env-file .env.example -f infra/docker-compose.yml config > /tmp/reforge-custom.yml
+          grep -q 'published: "5174"' /tmp/reforge-custom.yml
