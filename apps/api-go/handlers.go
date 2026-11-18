@@ -508,11 +508,14 @@ func (a *App) createDeployment(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"detail": "host and image are required"})
 		return
 	}
-	var hostCount, imageCount int64
-	a.db.Model(&Host{}).Where("id = ?", input.HostID).Count(&hostCount)
-	a.db.Model(&GoldImage{}).Where("id = ?", input.ImageID).Count(&imageCount)
-	if hostCount == 0 || imageCount == 0 {
+	var host Host
+	var image GoldImage
+	if a.db.First(&host, "id = ?", input.HostID).Error != nil || a.db.First(&image, "id = ?", input.ImageID).Error != nil {
 		writeJSON(w, 404, map[string]string{"detail": "host or image not found"})
+		return
+	}
+	if err := validateFreshDeploymentImage(image); err != nil {
+		writeJSON(w, 422, map[string]string{"detail": err.Error()})
 		return
 	}
 	row := DeploymentJob{

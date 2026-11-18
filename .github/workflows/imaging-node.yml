@@ -1,0 +1,27 @@
+name: imaging-node
+on:
+  pull_request:
+    paths:
+      - 'imaging/node/**'
+      - '.github/workflows/imaging-node.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'imaging/node/**'
+      - '.github/workflows/imaging-node.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: imaging/node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: imaging/node/go.mod
+          cache-dependency-path: imaging/node/go.mod
+      - run: go test -race ./...
+      - run: go vet ./...
