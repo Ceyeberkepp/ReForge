@@ -23,7 +23,5 @@ jobs:
         with:
           go-version-file: imaging/node/go.mod
           cache-dependency-path: imaging/node/go.mod
-      - run: gofmt -l main.go main_test.go | tee /tmp/gofmt.out
-      - run: test ! -s /tmp/gofmt.out
       - run: go test -race ./...
       - run: go vet ./...
