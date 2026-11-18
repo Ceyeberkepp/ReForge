@@ -294,7 +294,7 @@ function UploadProgress(p:{value:number;label:string}){return <div className="up
 
 function ModulePage(p:{icon:any;title:string;description:string;action:string;bullets:string[]}){
  const I=p.icon;
- return <div className="stack"><section className="panel moduleIntro"><div className="moduleTitle"><div className="moduleIcon"><I size={22}/></div><div><h3>{p.title}</h3><p>{p.description}</p></div></div><button className="primary" disabled title="Backend API is the next implementation phase"><Plus size={15}/>{p.action}</button></section><section className="panel emptyModule"><div className="emptyModuleIcon"><I size={28}/></div><h3>No records yet</h3><p>This v2 management surface is now in the server UI. The next implementation phase will add its database model, API and imaging-node workflow.</p><div className="featureChecks">{p.bullets.map(x=><span key={x}><CheckCircle2 size={15}/>{x}</span>)}</div></section></div>
+ return <div className="stack"><section className="panel moduleIntro"><div className="moduleTitle"><div className="moduleIcon"><I size={22}/></div><div><h3>{p.title}</h3><p>{p.description}</p></div></div><button className="primary" disabled title="Planned feature — no backend implementation yet"><Plus size={15}/>{p.action}</button></section><section className="panel emptyModule"><div className="emptyModuleIcon"><I size={28}/></div><h3>Not implemented yet</h3><p>This section is a design preview only. No backend workflow is available, and no changes can be saved here.</p><div className="featureChecks">{p.bullets.map(x=><span key={x}><Wrench size={15}/>{x} — planned</span>)}</div></section></div>
 }
 
 function AdminCenter(p:{go:(page:string)=>void}){
