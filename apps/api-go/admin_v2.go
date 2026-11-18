@@ -270,9 +270,19 @@ func (a *App) pxeSources(w http.ResponseWriter,r *http.Request){
 		a.db.Order("name").Find(&rows)
 		for _,x:=range rows{fmt.Fprintf(w,"item %s %s v%s\n",x.ID,x.Name,x.ImageVersion);count++}
 	case "clone":
-		var rows []CloneImage
-		a.db.Where("enabled = ?",true).Order("name").Find(&rows)
-		for _,x:=range rows{fmt.Fprintf(w,"item %s %s\n",x.ID,x.Name);count++}
+		macRaw:=r.URL.Query().Get("mac")
+		mac,err:=normalizeMAC(macRaw)
+		var host Host
+		if err==nil {
+			err=a.db.First(&host,"mac_address = ?",mac).Error
+		} else if uuidRaw:=strings.TrimSpace(r.URL.Query().Get("uuid"));uuidRaw!="" {
+			err=a.db.First(&host,"hardware_uuid = ?",uuidRaw).Error
+		}
+		if err==nil && host.ID!="" {
+			var rows []CloneImage
+			a.db.Where("enabled = ? AND source_host_id = ?",true,host.ID).Order("name").Find(&rows)
+			for _,x:=range rows{fmt.Fprintf(w,"item %s %s\n",x.ID,x.Name);count++}
+		}
 	default:
 		w.WriteHeader(http.StatusBadRequest);return
 	}
@@ -301,6 +311,26 @@ func (a *App) pxeAction(w http.ResponseWriter,r *http.Request){
 		if normalized,err:=normalizeMAC(macRaw);err==nil { mac=normalized }
 	}
 	if mac==""&&uuidRaw==""{w.WriteHeader(http.StatusBadRequest);return}
+	if !validPXEActionType(action,typ,source) { w.WriteHeader(http.StatusBadRequest);return }
+	if action=="install" {
+		switch typ {
+		case "iso":
+			var row ISOImage
+			if a.db.First(&row,"id = ? AND enabled = ?",source,true).Error!=nil {w.WriteHeader(http.StatusNotFound);return}
+		case "gold":
+			var row GoldImage
+			if a.db.First(&row,"id = ?",source).Error!=nil || validateFreshDeploymentImage(row)!=nil {w.WriteHeader(http.StatusUnprocessableEntity);return}
+		case "clone":
+			var row CloneImage
+			if a.db.First(&row,"id = ? AND enabled = ?",source,true).Error!=nil {w.WriteHeader(http.StatusNotFound);return}
+			var host Host
+			query:=a.db
+			if mac!="" {query=query.Where("mac_address = ?",mac)} else {query=query.Where("hardware_uuid = ?",uuidRaw)}
+			if query.First(&host).Error!=nil || !cloneMatchesHost(row,host) {
+				w.WriteHeader(http.StatusForbidden);return
+			}
+		}
+	}
 	task:=PXETask{ID:uuid.NewString(),HostMAC:mac,HostUUID:uuidRaw,Action:action,SourceType:typ,SourceID:source,RequestedBy:u.Username,Status:"queued",CreatedAt:time.Now().UTC()}
 	if a.db.Create(&task).Error!=nil{w.WriteHeader(http.StatusInternalServerError);return}
 	a.audit(r,"queue-"+action,"pxe-task",task.ID,true,typ)
