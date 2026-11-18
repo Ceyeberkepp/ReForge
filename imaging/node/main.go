@@ -75,11 +75,13 @@ func capture(src, dst string) error {
  if _, err := os.Lstat(dst + ".json"); err == nil { return errors.New("manifest already exists") } else if !os.IsNotExist(err) { return err }
  manifest, err := transfer(src, dst, nil)
  if err != nil { return err }
+ manifestCreated := false
  data, err := json.MarshalIndent(manifest, "", "  ")
  if err == nil {
   var file *os.File
   file, err = newDestination(dst + ".json")
   if err == nil {
+   manifestCreated = true
    _, err = file.Write(append(data, '\n'))
    if err == nil { err = file.Sync() }
    if cerr := file.Close(); err == nil { err = cerr }
@@ -87,7 +89,7 @@ func capture(src, dst string) error {
  }
  if err != nil {
   os.Remove(dst)
-  os.Remove(dst + ".json")
+  if manifestCreated { os.Remove(dst + ".json") }
   return err
  }
  return nil
