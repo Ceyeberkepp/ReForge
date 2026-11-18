@@ -26,10 +26,10 @@ jobs:
           src="$(mktemp -d)"
           dest="$(mktemp -d)"
           trap 'rm -rf "$src" "$dest"' EXIT
-          printf 'REFORGE_WORKER_TOKEN=checkout-secret\\n' > "$src/.env"
-          printf 'REFORGE_WORKER_TOKEN=production-secret\\n' > "$dest/.env"
+          printf 'REFORGE_WORKER_TOKEN=checkout-secret\n' > "$src/.env"
+          printf 'REFORGE_WORKER_TOKEN=production-secret\n' > "$dest/.env"
           mkdir -p "$src/infra"
-          printf 'new compose content\\n' > "$src/infra/docker-compose.yml"
+          printf 'new compose content\n' > "$src/infra/docker-compose.yml"
           (cd "$src" && tar --exclude='./.env' --exclude='./.git' -cf - .) | tar -C "$dest" -xf -
           grep -qx 'REFORGE_WORKER_TOKEN=production-secret' "$dest/.env"
           grep -qx 'new compose content' "$dest/infra/docker-compose.yml"
