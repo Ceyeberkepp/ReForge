@@ -39,7 +39,7 @@ jobs:
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
           # Exercise the exact preflight code from install.sh, without apt or Docker.
-          sed -n '/^ROOT="/,/^if \\[\\[ -f "\\.\\/infra\\/docker-compose.yml" \\]\\]; then/p' install.sh | sed '$d' > /tmp/reforge-preflight.sh
+          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-preflight.sh
           test -s /tmp/reforge-preflight.sh
           printf 'REFORGE_WORKER_TOKEN=old-token\\n' > "$root/.env"
           if REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh; then
