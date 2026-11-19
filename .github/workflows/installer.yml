@@ -74,6 +74,19 @@ jobs:
             echo "Relative install root unexpectedly accepted" >&2
             exit 1
           fi
+          # A symlinked parent was not rejected by the previous leaf-only check.
+          parent="$(mktemp -d)"
+          mkdir -p "$parent/real"
+          ln -s "$parent/real" "$parent/redirect"
+          trap 'rm -f "$link_root"; rm -rf "$real_root" "$parent"' EXIT
+          if REFORGE_ROOT="$parent/redirect/reforge" bash /tmp/reforge-root-preflight.sh; then
+            echo "Symlinked parent unexpectedly accepted" >&2
+            exit 1
+          fi
+          if REFORGE_ROOT="$parent/real/../reforge" bash /tmp/reforge-root-preflight.sh; then
+            echo "Traversal path unexpectedly accepted" >&2
+            exit 1
+          fi
           REFORGE_ROOT="$real_root" bash /tmp/reforge-root-preflight.sh
       - name: Verify unattended database selection
         run: |
