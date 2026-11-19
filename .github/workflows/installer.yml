@@ -121,6 +121,15 @@ jobs:
           test "$(REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "1"
           test "$(REFORGE_DB_CHOICE=2 REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "2"
           test "$(bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "1"
+      - name: Verify optional services never prompt without a terminal
+        run: |
+          set -euo pipefail
+          sed -n '/^ENABLE_MONGO="/,/^cat > .env <<EOF/p' install.sh | sed '$d' > /tmp/reforge-optional-services.sh
+          test -s /tmp/reforge-optional-services.sh
+          # /dev/null represents a noninteractive one-click installation.
+          timeout 5 bash -c 'source /tmp/reforge-optional-services.sh; test -z "$PROFILE"' </dev/null
+          timeout 5 env REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=1 bash -c 'source /tmp/reforge-optional-services.sh; test "$PROFILE" = ",mongodb,neo4j"' </dev/null
+          timeout 5 env REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-optional-services.sh; test -z "$PROFILE"' </dev/null
       - name: Verify installer never recursively deletes installation root
         run: |
           set -euo pipefail
