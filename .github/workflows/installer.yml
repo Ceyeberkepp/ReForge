@@ -88,6 +88,30 @@ jobs:
             exit 1
           fi
           REFORGE_ROOT="$real_root" bash /tmp/reforge-root-preflight.sh
+      - name: Reject missing deployed secrets and unrelated populated targets
+        run: |
+          set -euo pipefail
+          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-missing-env-preflight.sh
+          test -s /tmp/reforge-missing-env-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          mkdir -p "$root/infra"
+          printf 'services: {}\n' > "$root/infra/docker-compose.yml"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-missing-env-preflight.sh; then
+            echo "Existing deployment without .env unexpectedly accepted" >&2
+            exit 1
+          fi
+          printf 'REFORGE_WORKER_TOKEN=existing-token\nREFORGE_DB_DSN=existing-dsn\n' > "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-missing-env-preflight.sh
+          rm -rf "$root/infra" "$root/.env"
+          printf 'unrelated content\n' > "$root/important.txt"
+          mkdir -p infra
+          if REFORGE_ROOT="$root" bash /tmp/reforge-missing-env-preflight.sh; then
+            echo "Unrelated populated target unexpectedly accepted" >&2
+            exit 1
+          fi
+          rm "$root/important.txt"
+          REFORGE_ROOT="$root" bash /tmp/reforge-missing-env-preflight.sh
       - name: Verify unattended database selection
         run: |
           set -euo pipefail
