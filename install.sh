@@ -132,7 +132,7 @@ if [[ -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" ]]; then
 fi
 # Do not copy a local checkout into an unrelated populated destination.
 if [[ -f "./infra/docker-compose.yml" && "$(pwd -P)" != "${ROOT}" &&
-      -d "${ROOT}" && ! -f "${ROOT}/infra/docker-compose.yml" &&
+      -d "${ROOT}" && ! -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" &&
       -n "$(ls -A "${ROOT}" 2>/dev/null || true)" ]]; then
   echo "REFORGE_ROOT contains unrelated files; refusing to overwrite them." >&2
   exit 1
