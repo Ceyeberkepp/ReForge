@@ -91,7 +91,7 @@ jobs:
       - name: Reject missing deployed secrets and unrelated populated targets
         run: |
           set -euo pipefail
-          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-missing-env-preflight.sh
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-missing-env-preflight.sh
           test -s /tmp/reforge-missing-env-preflight.sh
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
