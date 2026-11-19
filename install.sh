@@ -254,7 +254,7 @@ esac
 
 ENABLE_MONGO="${REFORGE_ENABLE_MONGODB:-}"
 ENABLE_NEO4J="${REFORGE_ENABLE_NEO4J:-}"
-if [[ -z "${REFORGE_NONINTERACTIVE:-}" ]]; then
+if [[ -z "${REFORGE_NONINTERACTIVE:-}" && -t 0 ]]; then
   read -r -p "Enable optional MongoDB service? [y/N]: " ENABLE_MONGO || true
   read -r -p "Enable optional Neo4j graph service? [y/N]: " ENABLE_NEO4J || true
 fi
