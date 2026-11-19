@@ -33,6 +33,31 @@ jobs:
           (cd "$src" && tar --exclude='./.env' --exclude='./.git' -cf - .) | tar -C "$dest" -xf -
           grep -qx 'REFORGE_WORKER_TOKEN=production-secret' "$dest/.env"
           grep -qx 'new compose content' "$dest/infra/docker-compose.yml"
+      - name: Reject unsafe or incomplete upgrades before source copy
+        run: |
+          set -euo pipefail
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          # Exercise the exact preflight code from install.sh, without apt or Docker.
+          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-preflight.sh
+          test -s /tmp/reforge-preflight.sh
+          printf 'REFORGE_WORKER_TOKEN=old-token\n' > "$root/.env"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh; then
+            echo "Incomplete production credentials unexpectedly accepted" >&2
+            exit 1
+          fi
+          printf 'REFORGE_DB_DSN=postgres://existing\n' >> "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh
+          rm "$root/.env"
+          ln -s /etc/passwd "$root/.env"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh; then
+            echo "Symlinked credentials unexpectedly accepted" >&2
+            exit 1
+          fi
+          if REFORGE_ROOT=/ bash /tmp/reforge-preflight.sh; then
+            echo "Root filesystem unexpectedly accepted" >&2
+            exit 1
+          fi
       - name: Compose configuration
         run: docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
       - name: Check overridable web port
