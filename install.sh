@@ -149,6 +149,15 @@ if [[ -e "${ROOT}/.env" ]]; then
     exit 1
   fi
 fi
+# Reject invalid explicit web ports before changing deployment files. An upgrade
+# keeps its persisted port; fresh installs may request a different starting port.
+if [[ ! -f "${ROOT}/.env" && -n "${REFORGE_WEB_PORT:-}" ]]; then
+  if [[ ! "${REFORGE_WEB_PORT}" =~ ^[0-9]+$ ]] ||
+     (( 10#${REFORGE_WEB_PORT} < 1024 || 10#${REFORGE_WEB_PORT} > 65535 )); then
+    echo "REFORGE_WEB_PORT must be an integer from 1024 to 65535." >&2
+    exit 1
+  fi
+fi
 # Validate explicit fresh-install choices before copying or cloning deployed code.
 # Existing installations retain their persisted database and service configuration.
 if [[ ! -f "${ROOT}/.env" ]]; then
