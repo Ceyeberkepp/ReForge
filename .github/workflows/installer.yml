@@ -41,12 +41,12 @@ jobs:
           # Exercise the exact preflight code from install.sh, without apt or Docker.
           sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-preflight.sh
           test -s /tmp/reforge-preflight.sh
-          printf 'REFORGE_WORKER_TOKEN=old-token\\n' > "$root/.env"
+          printf 'REFORGE_WORKER_TOKEN=old-token\n' > "$root/.env"
           if REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh; then
             echo "Incomplete production credentials unexpectedly accepted" >&2
             exit 1
           fi
-          printf 'REFORGE_DB_DSN=postgres://existing\\n' >> "$root/.env"
+          printf 'REFORGE_DB_DSN=postgres://existing\n' >> "$root/.env"
           REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh
           rm "$root/.env"
           ln -s /etc/passwd "$root/.env"
