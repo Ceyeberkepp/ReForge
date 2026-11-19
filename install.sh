@@ -101,7 +101,9 @@ ROOT="${REFORGE_ROOT:-/opt/reforge}"
 if [[ -f "./infra/docker-compose.yml" ]]; then
   mkdir -p "${ROOT}"
   if [[ "$(pwd)" != "${ROOT}" ]]; then
-    cp -a . "${ROOT}/"
+    # Never overwrite a deployed .env with a developer checkout's .env.
+    # Copy code and assets while preserving runtime credentials and local Git metadata.
+    tar --exclude='./.env' --exclude='./.git' -cf - . | tar -C "${ROOT}" -xf -
   fi
 elif [[ ! -f "${ROOT}/infra/docker-compose.yml" ]]; then
   command -v git >/dev/null 2>&1 || {
