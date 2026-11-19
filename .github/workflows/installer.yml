@@ -39,7 +39,7 @@ jobs:
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
           # Exercise the exact preflight code from install.sh, without apt or Docker.
-          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-preflight.sh
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-preflight.sh
           test -s /tmp/reforge-preflight.sh
           printf 'REFORGE_WORKER_TOKEN=old-token\n' > "$root/.env"
           if REFORGE_ROOT="$root" bash /tmp/reforge-preflight.sh; then
@@ -64,7 +64,7 @@ jobs:
           real_root="$(mktemp -d)"
           link_root="${real_root}-link"
           trap 'rm -f "$link_root"; rm -rf "$real_root"' EXIT
-          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-root-preflight.sh
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-root-preflight.sh
           ln -s "$real_root" "$link_root"
           if REFORGE_ROOT="$link_root" bash /tmp/reforge-root-preflight.sh; then
             echo "Symlinked install root unexpectedly accepted" >&2
