@@ -105,6 +105,16 @@ if [[ -z "${ROOT}" || "${ROOT}" == "/" || "${ROOT}" == "." || "${ROOT}" == ".." 
   echo "REFORGE_ROOT must identify a dedicated installation directory." >&2
   exit 1
 fi
+# Refuse redirects of the deployment directory itself. A symlink could
+# otherwise redirect code extraction outside the intended install tree.
+if [[ "${ROOT}" != /* ]]; then
+  echo "REFORGE_ROOT must be an absolute path." >&2
+  exit 1
+fi
+if [[ -L "${ROOT}" ]]; then
+  echo "Refusing a symlinked ReForge installation root." >&2
+  exit 1
+fi
 if [[ -L "${ROOT}/.env" ]]; then
   echo "Refusing to use a symlinked production .env file." >&2
   exit 1
