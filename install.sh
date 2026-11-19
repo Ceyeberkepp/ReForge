@@ -173,8 +173,12 @@ echo "  2) MariaDB / MySQL"
 echo "  3) Microsoft SQL Server Express"
 DB_CHOICE="${REFORGE_DB_CHOICE:-}"
 if [[ -z "${DB_CHOICE}" ]]; then
-  read -r -p "Choose [1]: " DB_CHOICE
-  DB_CHOICE="${DB_CHOICE:-1}"
+  if [[ -n "${REFORGE_NONINTERACTIVE:-}" || ! -t 0 ]]; then
+    DB_CHOICE=1
+  else
+    read -r -p "Choose [1]: " DB_CHOICE
+    DB_CHOICE="${DB_CHOICE:-1}"
+  fi
 fi
 
 DBPASS="$(secret 36)"
