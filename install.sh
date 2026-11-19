@@ -33,6 +33,7 @@ apt-get install -y --no-install-recommends \
   openssl \
   gnupg \
   coreutils \
+  tar \
   iproute2
 
 if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
