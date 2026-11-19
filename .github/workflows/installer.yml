@@ -112,6 +112,30 @@ jobs:
           fi
           rm "$root/important.txt"
           REFORGE_ROOT="$root" bash /tmp/reforge-missing-env-preflight.sh
+      - name: Reject invalid web ports before deployment mutation
+        run: |
+          set -euo pipefail
+          # Run the installer's exact preflight segment without apt, Docker or file copy.
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-port-preflight.sh
+          test -s /tmp/reforge-port-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          printf 'preserve me\n' > "$root/sentinel"
+          for port in 0 80 1023 65536 9999999999999999999999999999 08080 abc 1234x; do
+            if REFORGE_ROOT="$root" REFORGE_WEB_PORT="$port" bash /tmp/reforge-port-preflight.sh; then
+              echo "Invalid port accepted: $port" >&2
+              exit 1
+            fi
+            test "$(cat "$root/sentinel")" = "preserve me"
+            test "$(find "$root" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
+          done
+          for port in 1024 5173 65535; do
+            REFORGE_ROOT="$root" REFORGE_WEB_PORT="$port" bash /tmp/reforge-port-preflight.sh
+          done
+          # Upgrade preflight must not replace or reject persisted settings.
+          printf 'REFORGE_WORKER_TOKEN=existing\nREFORGE_DB_DSN=existing\nREFORGE_WEB_PORT=5173\n' > "$root/.env"
+          REFORGE_ROOT="$root" REFORGE_WEB_PORT=invalid bash /tmp/reforge-port-preflight.sh
+          grep -qx 'REFORGE_WEB_PORT=5173' "$root/.env"
       - name: Verify unattended database selection
         run: |
           set -euo pipefail
