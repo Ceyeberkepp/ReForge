@@ -58,6 +58,23 @@ jobs:
             echo "Root filesystem unexpectedly accepted" >&2
             exit 1
           fi
+      - name: Reject redirected or relative install roots
+        run: |
+          set -euo pipefail
+          real_root="$(mktemp -d)"
+          link_root="${real_root}-link"
+          trap 'rm -f "$link_root"; rm -rf "$real_root"' EXIT
+          sed -n '/^ROOT="/,/^if .*infra\/docker-compose.yml/p' install.sh | sed '$d' > /tmp/reforge-root-preflight.sh
+          ln -s "$real_root" "$link_root"
+          if REFORGE_ROOT="$link_root" bash /tmp/reforge-root-preflight.sh; then
+            echo "Symlinked install root unexpectedly accepted" >&2
+            exit 1
+          fi
+          if REFORGE_ROOT=relative/reforge bash /tmp/reforge-root-preflight.sh; then
+            echo "Relative install root unexpectedly accepted" >&2
+            exit 1
+          fi
+          REFORGE_ROOT="$real_root" bash /tmp/reforge-root-preflight.sh
       - name: Verify unattended database selection
         run: |
           set -euo pipefail
