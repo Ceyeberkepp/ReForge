@@ -111,6 +111,14 @@ if [[ "${ROOT}" != /* ]]; then
   echo "REFORGE_ROOT must be an absolute path." >&2
   exit 1
 fi
+# Resolve existing parent components as well as the final directory. This
+# prevents /safe/link-to-elsewhere/reforge and /opt/../etc-style redirects.
+# realpath -m accepts a not-yet-created final installation directory.
+CANONICAL_ROOT="$(realpath -m -- "${ROOT}")"
+if [[ "${ROOT}" != "${CANONICAL_ROOT}" ]]; then
+  echo "REFORGE_ROOT must be a canonical absolute path without symlinked parents or traversal." >&2
+  exit 1
+fi
 if [[ -L "${ROOT}" ]]; then
   echo "Refusing a symlinked ReForge installation root." >&2
   exit 1
