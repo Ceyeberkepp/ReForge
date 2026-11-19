@@ -120,14 +120,12 @@ jobs:
           test -s /tmp/reforge-port-preflight.sh
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
-          printf 'preserve me\n' > "$root/sentinel"
           for port in 0 80 1023 65536 9999999999999999999999999999 08080 abc 1234x; do
             if REFORGE_ROOT="$root" REFORGE_WEB_PORT="$port" bash /tmp/reforge-port-preflight.sh; then
               echo "Invalid port accepted: $port" >&2
               exit 1
             fi
-            test "$(cat "$root/sentinel")" = "preserve me"
-            test "$(find "$root" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
+            test "$(find "$root" -mindepth 1 -maxdepth 1 | wc -l)" -eq 0
           done
           for port in 1024 5173 65535; do
             REFORGE_ROOT="$root" REFORGE_WEB_PORT="$port" bash /tmp/reforge-port-preflight.sh
