@@ -63,3 +63,26 @@ func TestEmptyImage(t *testing.T) {
  if err := restore(image, target); err != nil { t.Fatal(err) }
  if b, err := os.ReadFile(target); err != nil || len(b) != 0 { t.Fatal("empty image roundtrip failed") }
 }
+
+func TestRejectsAmbiguousManifestsBeforeRestore(t *testing.T) {
+ dir := t.TempDir()
+ src, image := filepath.Join(dir, "source"), filepath.Join(dir, "image")
+ if err := os.WriteFile(src, []byte("recovery data"), 0600); err != nil { t.Fatal(err) }
+ if err := capture(src, image); err != nil { t.Fatal(err) }
+ valid, err := os.ReadFile(image + ".json")
+ if err != nil { t.Fatal(err) }
+ cases := map[string][]byte{
+  "trailing-object": append(append([]byte{}, valid...), []byte("{}")...),
+  "trailing-garbage": append(append([]byte{}, valid...), []byte("garbage")...),
+  "unknown-field": bytes.Replace(valid, []byte("{"), []byte("{\"untrusted\":true,"), 1),
+  "oversized": append(append([]byte{}, valid...), bytes.Repeat([]byte(" "), 4097)...),
+ }
+ for name, malformed := range cases {
+  t.Run(name, func(t *testing.T) {
+   if err := os.WriteFile(image + ".json", malformed, 0600); err != nil { t.Fatal(err) }
+   target := filepath.Join(dir, name+"-target")
+   if err := restore(image, target); err == nil { t.Fatal("ambiguous manifest accepted") }
+   if _, err := os.Lstat(target); !os.IsNotExist(err) { t.Fatal("target created for invalid manifest") }
+  })
+ }
+}
