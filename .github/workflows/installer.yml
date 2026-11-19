@@ -58,6 +58,15 @@ jobs:
             echo "Root filesystem unexpectedly accepted" >&2
             exit 1
           fi
+      - name: Verify unattended database selection
+        run: |
+          set -euo pipefail
+          # Exercise the exact selection block without invoking apt or Docker.
+          sed -n '/^DB_CHOICE="/,/^DBPASS="/p' install.sh | sed '$d' > /tmp/reforge-db-choice.sh
+          test -s /tmp/reforge-db-choice.sh
+          test "$(REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "1"
+          test "$(REFORGE_DB_CHOICE=2 REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "2"
+          test "$(bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "1"
       - name: Compose configuration
         run: docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
       - name: Check overridable web port
