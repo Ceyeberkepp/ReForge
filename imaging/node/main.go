@@ -100,7 +100,14 @@ func readManifest(path string) (Manifest, error) {
  f, _, err := regularInput(path)
  if err != nil { return m, err }
  defer f.Close()
- if err := json.NewDecoder(io.LimitReader(f, 4096)).Decode(&m); err != nil { return m, err }
+ decoder := json.NewDecoder(io.LimitReader(f, 4097))
+ decoder.DisallowUnknownFields()
+ if err := decoder.Decode(&m); err != nil { return m, err }
+ // A manifest is exactly one JSON object. Reject appended JSON, garbage and
+ // oversized metadata rather than accepting an ambiguous integrity record.
+ var trailing any
+ if err := decoder.Decode(&trailing); err != io.EOF { return m, errors.New("manifest contains trailing data or exceeds size limit") }
+ if decoder.InputOffset() > 4096 { return m, errors.New("manifest exceeds size limit") }
  if m.Format != imageFormat || m.Size < 0 || len(m.SHA256) != 64 { return m, errors.New("invalid manifest") }
  if _, err := hex.DecodeString(m.SHA256); err != nil { return m, err }
  return m, nil
