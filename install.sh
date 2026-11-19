@@ -123,6 +123,20 @@ if [[ -L "${ROOT}" ]]; then
   echo "Refusing a symlinked ReForge installation root." >&2
   exit 1
 fi
+# A previously deployed Compose stack without its credential file must not be
+# treated as a new install. That would silently generate different database
+# credentials against persistent volumes and strand existing data.
+if [[ -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" ]]; then
+  echo "Existing ReForge deployment is missing .env; restore its credentials from backup before upgrading." >&2
+  exit 1
+fi
+# Do not copy a local checkout into an unrelated populated destination.
+if [[ -f "./infra/docker-compose.yml" && "$(pwd -P)" != "${ROOT}" &&
+      -d "${ROOT}" && ! -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" &&
+      -n "$(ls -A "${ROOT}" 2>/dev/null || true)" ]]; then
+  echo "REFORGE_ROOT contains unrelated files; refusing to overwrite them." >&2
+  exit 1
+fi
 if [[ -L "${ROOT}/.env" ]]; then
   echo "Refusing to use a symlinked production .env file." >&2
   exit 1
