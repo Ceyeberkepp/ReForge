@@ -137,7 +137,8 @@ jobs:
           test -s /tmp/reforge-options.sh
           # With both choices explicit, even a TTY must not cause a read.
           # 'script' provides a pseudo-terminal, and timeout detects hanging prompts.
-          timeout 5 script -q -e -c "env REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=no bash -c 'PROFILE=\\"\\"; source /tmp/reforge-options.sh; test \\"\\$PROFILE\\" = \\",mongodb\\"'" /dev/null
+          printf '%s\n' 'PROFILE=""' 'source /tmp/reforge-options.sh' 'test "$PROFILE" = ",mongodb"' > /tmp/reforge-tty-check.sh
+          timeout 5 script -q -e -c "env REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=no bash /tmp/reforge-tty-check.sh" /dev/null
       - name: Verify installer never recursively deletes installation root
         run: |
           set -euo pipefail
