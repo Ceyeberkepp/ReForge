@@ -255,8 +255,12 @@ esac
 ENABLE_MONGO="${REFORGE_ENABLE_MONGODB:-}"
 ENABLE_NEO4J="${REFORGE_ENABLE_NEO4J:-}"
 if [[ -z "${REFORGE_NONINTERACTIVE:-}" && -t 0 ]]; then
-  read -r -p "Enable optional MongoDB service? [y/N]: " ENABLE_MONGO || true
-  read -r -p "Enable optional Neo4j graph service? [y/N]: " ENABLE_NEO4J || true
+  if [[ -z "${ENABLE_MONGO}" ]]; then
+    read -r -p "Enable optional MongoDB service? [y/N]: " ENABLE_MONGO || true
+  fi
+  if [[ -z "${ENABLE_NEO4J}" ]]; then
+    read -r -p "Enable optional Neo4j graph service? [y/N]: " ENABLE_NEO4J || true
+  fi
 fi
 [[ "${ENABLE_MONGO,,}" == "y" || "${ENABLE_MONGO,,}" == "yes" || "${ENABLE_MONGO}" == "1" ]] && PROFILE+=",mongodb"
 [[ "${ENABLE_NEO4J,,}" == "y" || "${ENABLE_NEO4J,,}" == "yes" || "${ENABLE_NEO4J}" == "1" ]] && PROFILE+=",neo4j"

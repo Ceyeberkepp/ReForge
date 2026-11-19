@@ -130,6 +130,15 @@ jobs:
           timeout 5 bash -c 'source /tmp/reforge-optional-services.sh; test -z "$PROFILE"' </dev/null
           timeout 5 env REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=1 bash -c 'source /tmp/reforge-optional-services.sh; test "$PROFILE" = ",mongodb,neo4j"' </dev/null
           timeout 5 env REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-optional-services.sh; test -z "$PROFILE"' </dev/null
+      - name: Verify explicit optional-service selections are never prompted again
+        run: |
+          set -euo pipefail
+          sed -n '/^ENABLE_MONGO="/,/^cat > .env <<EOF/p' install.sh | sed '$d' > /tmp/reforge-options.sh
+          test -s /tmp/reforge-options.sh
+          # With both choices explicit, even a TTY must not cause a read.
+          # 'script' provides a pseudo-terminal, and timeout detects hanging prompts.
+          printf '%s\n' 'PROFILE=""' 'source /tmp/reforge-options.sh' 'test "$PROFILE" = ",mongodb"' > /tmp/reforge-tty-check.sh
+          timeout 5 script -q -e -c "env REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=no bash /tmp/reforge-tty-check.sh" /dev/null
       - name: Verify installer never recursively deletes installation root
         run: |
           set -euo pipefail
