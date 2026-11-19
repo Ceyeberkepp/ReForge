@@ -262,6 +262,17 @@ if [[ -z "${REFORGE_NONINTERACTIVE:-}" && -t 0 ]]; then
     read -r -p "Enable optional Neo4j graph service? [y/N]: " ENABLE_NEO4J || true
   fi
 fi
+# Reject mistyped explicit choices rather than silently disabling a requested service.
+# Accept the documented yes/no forms; omitted values remain disabled by default.
+for SERVICE_VALUE in "${ENABLE_MONGO}" "${ENABLE_NEO4J}"; do
+  case "${SERVICE_VALUE,,}" in
+    ""|y|yes|1|n|no|0) ;;
+    *)
+      echo "Optional service selections must be yes/no, y/n, or 1/0." >&2
+      exit 1
+      ;;
+  esac
+done
 [[ "${ENABLE_MONGO,,}" == "y" || "${ENABLE_MONGO,,}" == "yes" || "${ENABLE_MONGO}" == "1" ]] && PROFILE+=",mongodb"
 [[ "${ENABLE_NEO4J,,}" == "y" || "${ENABLE_NEO4J,,}" == "yes" || "${ENABLE_NEO4J}" == "1" ]] && PROFILE+=",neo4j"
 
