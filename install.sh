@@ -165,7 +165,8 @@ elif [[ ! -f "${ROOT}/infra/docker-compose.yml" ]]; then
     echo "${ROOT} exists and is not a ReForge installation." >&2
     exit 1
   fi
-  rm -rf "${ROOT}"
+  # Git can clone into an existing empty directory. Never recursively delete
+  # an installation target, even when it appeared empty during preflight.
   git clone --depth 1 https://github.com/Ceyeberkepp/ReForge.git "${ROOT}"
 fi
 cd "${ROOT}"

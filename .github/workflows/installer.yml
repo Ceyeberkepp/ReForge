@@ -121,6 +121,19 @@ jobs:
           test "$(REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "1"
           test "$(REFORGE_DB_CHOICE=2 REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "2"
           test "$(bash -c 'source /tmp/reforge-db-choice.sh; echo "$DB_CHOICE"' </dev/null)" = "1"
+      - name: Verify installer never recursively deletes installation root
+        run: |
+          set -euo pipefail
+          # Guard the fresh-clone path against reintroducing destructive cleanup.
+          ! grep -Eq '^[[:space:]]*rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*[[:space:]]+"?\$\{ROOT\}' install.sh
+          # Git supports cloning into an existing empty destination.
+          src="$(mktemp -d)"
+          dest="$(mktemp -d)"
+          trap 'rm -rf "$src" "$dest"' EXIT
+          git -C "$src" init -q
+          git -C "$src" -c user.name=CI -c user.email=ci@example.invalid commit --allow-empty -qm initial
+          git clone -q "$src" "$dest"
+          test -d "$dest/.git"
       - name: Compose configuration
         run: docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
       - name: Check overridable web port
