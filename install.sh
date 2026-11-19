@@ -149,6 +149,20 @@ if [[ -e "${ROOT}/.env" ]]; then
     exit 1
   fi
 fi
+# Validate explicit fresh-install choices before copying or cloning deployed code.
+# Existing installations retain their persisted database and service configuration.
+if [[ ! -f "${ROOT}/.env" ]]; then
+  case "${REFORGE_DB_CHOICE:-}" in
+    ""|1|2|3) ;;
+    *) echo "Invalid database selection (expected 1, 2, or 3)." >&2; exit 1 ;;
+  esac
+  for SERVICE_VALUE in "${REFORGE_ENABLE_MONGODB:-}" "${REFORGE_ENABLE_NEO4J:-}"; do
+    case "${SERVICE_VALUE,,}" in
+      ""|y|yes|1|n|no|0) ;;
+      *) echo "Optional service selections must be yes/no, y/n, or 1/0." >&2; exit 1 ;;
+    esac
+  done
+fi
 if [[ -f "./infra/docker-compose.yml" ]]; then
   mkdir -p "${ROOT}"
   if [[ "$(pwd)" != "${ROOT}" ]]; then
