@@ -130,6 +130,20 @@ jobs:
           timeout 5 bash -c 'source /tmp/reforge-optional-services.sh; test -z "$PROFILE"' </dev/null
           timeout 5 env REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=1 bash -c 'source /tmp/reforge-optional-services.sh; test "$PROFILE" = ",mongodb,neo4j"' </dev/null
           timeout 5 env REFORGE_NONINTERACTIVE=1 bash -c 'source /tmp/reforge-optional-services.sh; test -z "$PROFILE"' </dev/null
+      - name: Reject invalid optional-service selections
+        run: |
+          set -euo pipefail
+          sed -n '/^ENABLE_MONGO="/,/^cat > .env <<EOF/p' install.sh | sed '$d' > /tmp/reforge-options-validation.sh
+          test -s /tmp/reforge-options-validation.sh
+          env PROFILE="" REFORGE_ENABLE_MONGODB=yes REFORGE_ENABLE_NEO4J=no bash -c 'source /tmp/reforge-options-validation.sh; test "$PROFILE" = ",mongodb"' </dev/null
+          if env PROFILE="" REFORGE_ENABLE_MONGODB=yees bash -c 'source /tmp/reforge-options-validation.sh' </dev/null; then
+            echo "Invalid MongoDB choice unexpectedly accepted" >&2
+            exit 1
+          fi
+          if env PROFILE="" REFORGE_ENABLE_NEO4J=maybe bash -c 'source /tmp/reforge-options-validation.sh' </dev/null; then
+            echo "Invalid Neo4j choice unexpectedly accepted" >&2
+            exit 1
+          fi
       - name: Verify explicit optional-service selections are never prompted again
         run: |
           set -euo pipefail
