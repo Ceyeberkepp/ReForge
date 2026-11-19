@@ -99,6 +99,24 @@ secret() {
 }
 
 ROOT="${REFORGE_ROOT:-/opt/reforge}"
+# Refuse unsafe or incomplete existing installations BEFORE changing deployed code.
+# In particular, do not follow a symlinked credential file during upgrade.
+if [[ -z "${ROOT}" || "${ROOT}" == "/" || "${ROOT}" == "." || "${ROOT}" == ".." ]]; then
+  echo "REFORGE_ROOT must identify a dedicated installation directory." >&2
+  exit 1
+fi
+if [[ -L "${ROOT}/.env" ]]; then
+  echo "Refusing to use a symlinked production .env file." >&2
+  exit 1
+fi
+if [[ -e "${ROOT}/.env" ]]; then
+  if [[ ! -f "${ROOT}/.env" ]] ||
+     ! grep -q '^REFORGE_WORKER_TOKEN=.' "${ROOT}/.env" ||
+     ! grep -q '^REFORGE_DB_DSN=.' "${ROOT}/.env"; then
+    echo "Existing .env is invalid; refusing to modify installed code." >&2
+    exit 1
+  fi
+fi
 if [[ -f "./infra/docker-compose.yml" ]]; then
   mkdir -p "${ROOT}"
   if [[ "$(pwd)" != "${ROOT}" ]]; then
