@@ -7,8 +7,10 @@ ReForge generates its iPXE entry point at:
 Example chain target:
 
 ```
-http://REFORGE-SERVER:8080/boot/ipxe?api_url=http://REFORGE-SERVER:8080
+http://REFORGE-SERVER:5173/boot/ipxe?api_url=http://REFORGE-SERVER:5173
 ```
+
+The example uses the default web port, **5173**. On installations where the one-click installer selected another available port, use the saved `REFORGE_WEB_PORT` from the installation `.env` instead. The internal API container's port 8080 is not published directly by the default Docker Compose deployment. This endpoint generates a chain script; it does not by itself provide a bootable imaging kernel or disk-write authorization.
 
 ## Existing DHCP server
 
