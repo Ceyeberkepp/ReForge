@@ -19,6 +19,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.27.x"
+          cache-dependency-path: apps/api-go/go.sum
       - name: API build and vet
         working-directory: apps/api-go
         run: |
