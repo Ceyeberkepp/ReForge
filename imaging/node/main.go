@@ -13,6 +13,7 @@ import (
  "io"
  "os"
  "path/filepath"
+ "strings"
 )
 
 type Manifest struct {
@@ -111,7 +112,12 @@ func readManifest(path string) (Manifest, error) {
   token, err := keyDecoder.Token()
   if err != nil { return m, err }
   key, ok := token.(string)
-  if !ok || seen[key] { return m, errors.New("manifest contains duplicate or invalid key") }
+  if !ok { return m, errors.New("manifest contains invalid key") }
+  // encoding/json matches struct fields case-insensitively; reject aliases
+  // such as "size" and "SIZE" before decoding integrity metadata.
+  for prior := range seen {
+   if strings.EqualFold(prior, key) { return m, errors.New("manifest contains duplicate key") }
+  }
   seen[key] = true
   var value json.RawMessage
   if err := keyDecoder.Decode(&value); err != nil { return m, err }
