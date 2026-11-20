@@ -76,6 +76,8 @@ func TestRejectsAmbiguousManifestsBeforeRestore(t *testing.T) {
   "trailing-garbage": append(append([]byte{}, valid...), []byte("garbage")...),
   "unknown-field": bytes.Replace(valid, []byte("{"), []byte("{\"untrusted\":true,"), 1),
   "duplicate-size": bytes.Replace(valid, []byte("\"size\":"), []byte("\"size\":0,\"size\":"), 1),
+  "casefold-duplicate-size": bytes.Replace(valid, []byte("\"size\":"), []byte("\"SIZE\":0,\"size\":"), 1),
+  "casefold-duplicate-sha256": bytes.Replace(valid, []byte("\"sha256\":"), []byte("\"SHA256\":\"ignored\",\"sha256\":"), 1),
   "duplicate-sha256": bytes.Replace(valid, []byte("\"sha256\":"), []byte("\"sha256\":\"ignored\",\"sha256\":"), 1),
   "oversized": append(append([]byte{}, valid...), bytes.Repeat([]byte(" "), 4097)...),
  }
