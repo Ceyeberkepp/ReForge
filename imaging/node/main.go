@@ -101,6 +101,23 @@ func readManifest(path string) (Manifest, error) {
  if err != nil { return m, err }
  defer f.Close()
  if size > 4096 { return m, errors.New("manifest exceeds size limit") }
+ // Reject duplicate object keys: encoding/json otherwise silently accepts the
+ // last value, making integrity metadata ambiguous across parsers.
+ keyDecoder := json.NewDecoder(f)
+ opening, err := keyDecoder.Token()
+ if err != nil || opening != json.Delim('{') { return m, errors.New("manifest must be an object") }
+ seen := make(map[string]bool)
+ for keyDecoder.More() {
+  token, err := keyDecoder.Token()
+  if err != nil { return m, err }
+  key, ok := token.(string)
+  if !ok || seen[key] { return m, errors.New("manifest contains duplicate or invalid key") }
+  seen[key] = true
+  var value json.RawMessage
+  if err := keyDecoder.Decode(&value); err != nil { return m, err }
+ }
+ if _, err := keyDecoder.Token(); err != nil { return m, err }
+ if _, err := f.Seek(0, io.SeekStart); err != nil { return m, err }
  decoder := json.NewDecoder(f)
  decoder.DisallowUnknownFields()
  if err := decoder.Decode(&m); err != nil { return m, err }
