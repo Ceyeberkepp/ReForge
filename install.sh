@@ -74,6 +74,16 @@ if [[ -e "${ROOT}/.env" ]]; then
     exit 1
   fi
 fi
+# Validate the persisted port on upgrades before changing host packages.
+# An explicit shell override is intentionally ignored for existing installs.
+if [[ -f "${ROOT}/.env" ]] && grep -q '^REFORGE_WEB_PORT=' "${ROOT}/.env"; then
+  SAVED_WEB_PORT="$(sed -n 's/^REFORGE_WEB_PORT=//p' "${ROOT}/.env" | tail -n 1)"
+  if [[ ! "${SAVED_WEB_PORT}" =~ ^[1-9][0-9]{3,4}$ ]] ||
+     (( 10#${SAVED_WEB_PORT:-0} < 1024 || 10#${SAVED_WEB_PORT:-0} > 65535 )); then
+    echo "Existing REFORGE_WEB_PORT is invalid; repair .env before upgrading." >&2
+    exit 1
+  fi
+fi
 # Reject invalid explicit web ports before changing deployment files. An upgrade
 # keeps its persisted port; fresh installs may request a different starting port.
 if [[ ! -f "${ROOT}/.env" && -n "${REFORGE_WEB_PORT:-}" ]]; then
