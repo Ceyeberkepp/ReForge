@@ -149,6 +149,15 @@ jobs:
           printf 'REFORGE_WORKER_TOKEN=existing\nREFORGE_DB_DSN=existing\nREFORGE_WEB_PORT=5173\n' > "$root/.env"
           REFORGE_ROOT="$root" REFORGE_WEB_PORT=invalid bash /tmp/reforge-port-preflight.sh
           grep -qx 'REFORGE_WEB_PORT=5173' "$root/.env"
+          for bad_port in 80 65536 abc 08080; do
+            sed -i "s/^REFORGE_WEB_PORT=.*/REFORGE_WEB_PORT=${bad_port}/" "$root/.env"
+            if REFORGE_ROOT="$root" bash /tmp/reforge-port-preflight.sh; then
+              echo "Invalid persisted port accepted: $bad_port" >&2
+              exit 1
+            fi
+          done
+          sed -i 's/^REFORGE_WEB_PORT=.*/REFORGE_WEB_PORT=5173/' "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-port-preflight.sh
       - name: Verify unattended database selection
         run: |
           set -euo pipefail
