@@ -77,6 +77,12 @@ fi
 # Validate the persisted port on upgrades before changing host packages.
 # An explicit shell override is intentionally ignored for existing installs.
 if [[ -f "${ROOT}/.env" ]] && grep -q '^REFORGE_WEB_PORT=' "${ROOT}/.env"; then
+  # Duplicate keys are ambiguous across dotenv/Compose readers; fail closed.
+  PORT_KEY_COUNT="$(grep -c '^REFORGE_WEB_PORT=' "${ROOT}/.env")"
+  if (( PORT_KEY_COUNT != 1 )); then
+    echo "Existing .env has duplicate REFORGE_WEB_PORT entries; repair before upgrading." >&2
+    exit 1
+  fi
   SAVED_WEB_PORT="$(sed -n 's/^REFORGE_WEB_PORT=//p' "${ROOT}/.env" | tail -n 1)"
   if [[ ! "${SAVED_WEB_PORT}" =~ ^[1-9][0-9]{3,4}$ ]] ||
      (( 10#${SAVED_WEB_PORT:-0} < 1024 || 10#${SAVED_WEB_PORT:-0} > 65535 )); then

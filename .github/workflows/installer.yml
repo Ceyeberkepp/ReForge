@@ -158,6 +158,13 @@ jobs:
           done
           sed -i 's/^REFORGE_WEB_PORT=.*/REFORGE_WEB_PORT=5173/' "$root/.env"
           REFORGE_ROOT="$root" bash /tmp/reforge-port-preflight.sh
+          # Conflicting duplicate dotenv keys must fail before host changes.
+          printf 'REFORGE_WEB_PORT=5174\n' >> "$root/.env"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-port-preflight.sh; then
+            echo 'Duplicate persisted REFORGE_WEB_PORT keys accepted' >&2
+            exit 1
+          fi
+          test "$(grep -c '^REFORGE_WEB_PORT=' "$root/.env")" -eq 2
       - name: Verify unattended database selection
         run: |
           set -euo pipefail
