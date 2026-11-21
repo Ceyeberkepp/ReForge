@@ -22,6 +22,82 @@ case "${ID:-}" in
     ;;
 esac
 
+# Validate installation safety before modifying host packages or services.
+ROOT="${REFORGE_ROOT:-/opt/reforge}"
+# Refuse unsafe or incomplete existing installations BEFORE changing deployed code.
+# In particular, do not follow a symlinked credential file during upgrade.
+if [[ -z "${ROOT}" || "${ROOT}" == "/" || "${ROOT}" == "." || "${ROOT}" == ".." ]]; then
+  echo "REFORGE_ROOT must identify a dedicated installation directory." >&2
+  exit 1
+fi
+# Refuse redirects of the deployment directory itself. A symlink could
+# otherwise redirect code extraction outside the intended install tree.
+if [[ "${ROOT}" != /* ]]; then
+  echo "REFORGE_ROOT must be an absolute path." >&2
+  exit 1
+fi
+# Resolve existing parent components as well as the final directory. This
+# prevents /safe/link-to-elsewhere/reforge and /opt/../etc-style redirects.
+# realpath -m accepts a not-yet-created final installation directory.
+CANONICAL_ROOT="$(realpath -m -- "${ROOT}")"
+if [[ "${ROOT}" != "${CANONICAL_ROOT}" ]]; then
+  echo "REFORGE_ROOT must be a canonical absolute path without symlinked parents or traversal." >&2
+  exit 1
+fi
+if [[ -L "${ROOT}" ]]; then
+  echo "Refusing a symlinked ReForge installation root." >&2
+  exit 1
+fi
+# A previously deployed Compose stack without its credential file must not be
+# treated as a new install. That would silently generate different database
+# credentials against persistent volumes and strand existing data.
+if [[ -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" ]]; then
+  echo "Existing ReForge deployment is missing .env; restore its credentials from backup before upgrading." >&2
+  exit 1
+fi
+# Do not copy a local checkout into an unrelated populated destination.
+if [[ -f "./infra/docker-compose.yml" && "$(pwd -P)" != "${ROOT}" &&
+      -d "${ROOT}" && ! -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" &&
+      -n "$(ls -A "${ROOT}" 2>/dev/null || true)" ]]; then
+  echo "REFORGE_ROOT contains unrelated files; refusing to overwrite them." >&2
+  exit 1
+fi
+if [[ -L "${ROOT}/.env" ]]; then
+  echo "Refusing to use a symlinked production .env file." >&2
+  exit 1
+fi
+if [[ -e "${ROOT}/.env" ]]; then
+  if [[ ! -f "${ROOT}/.env" ]] ||
+     ! grep -q '^REFORGE_WORKER_TOKEN=.' "${ROOT}/.env" ||
+     ! grep -q '^REFORGE_DB_DSN=.' "${ROOT}/.env"; then
+    echo "Existing .env is invalid; refusing to modify installed code." >&2
+    exit 1
+  fi
+fi
+# Reject invalid explicit web ports before changing deployment files. An upgrade
+# keeps its persisted port; fresh installs may request a different starting port.
+if [[ ! -f "${ROOT}/.env" && -n "${REFORGE_WEB_PORT:-}" ]]; then
+  if [[ ! "${REFORGE_WEB_PORT}" =~ ^[1-9][0-9]{3,4}$ ]] ||
+     (( 10#${REFORGE_WEB_PORT} < 1024 || 10#${REFORGE_WEB_PORT} > 65535 )); then
+    echo "REFORGE_WEB_PORT must be an integer from 1024 to 65535." >&2
+    exit 1
+  fi
+fi
+# Validate explicit fresh-install choices before copying or cloning deployed code.
+# Existing installations retain their persisted database and service configuration.
+if [[ ! -f "${ROOT}/.env" ]]; then
+  case "${REFORGE_DB_CHOICE:-}" in
+    ""|1|2|3) ;;
+    *) echo "Invalid database selection (expected 1, 2, or 3)." >&2; exit 1 ;;
+  esac
+  for SERVICE_VALUE in "${REFORGE_ENABLE_MONGODB:-}" "${REFORGE_ENABLE_NEO4J:-}"; do
+    case "${SERVICE_VALUE,,}" in
+      ""|y|yes|1|n|no|0) ;;
+      *) echo "Optional service selections must be yes/no, y/n, or 1/0." >&2; exit 1 ;;
+    esac
+  done
+fi
+
 echo "[1/6] Installing base system dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -98,80 +174,6 @@ secret() {
   openssl rand -hex 24
 }
 
-ROOT="${REFORGE_ROOT:-/opt/reforge}"
-# Refuse unsafe or incomplete existing installations BEFORE changing deployed code.
-# In particular, do not follow a symlinked credential file during upgrade.
-if [[ -z "${ROOT}" || "${ROOT}" == "/" || "${ROOT}" == "." || "${ROOT}" == ".." ]]; then
-  echo "REFORGE_ROOT must identify a dedicated installation directory." >&2
-  exit 1
-fi
-# Refuse redirects of the deployment directory itself. A symlink could
-# otherwise redirect code extraction outside the intended install tree.
-if [[ "${ROOT}" != /* ]]; then
-  echo "REFORGE_ROOT must be an absolute path." >&2
-  exit 1
-fi
-# Resolve existing parent components as well as the final directory. This
-# prevents /safe/link-to-elsewhere/reforge and /opt/../etc-style redirects.
-# realpath -m accepts a not-yet-created final installation directory.
-CANONICAL_ROOT="$(realpath -m -- "${ROOT}")"
-if [[ "${ROOT}" != "${CANONICAL_ROOT}" ]]; then
-  echo "REFORGE_ROOT must be a canonical absolute path without symlinked parents or traversal." >&2
-  exit 1
-fi
-if [[ -L "${ROOT}" ]]; then
-  echo "Refusing a symlinked ReForge installation root." >&2
-  exit 1
-fi
-# A previously deployed Compose stack without its credential file must not be
-# treated as a new install. That would silently generate different database
-# credentials against persistent volumes and strand existing data.
-if [[ -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" ]]; then
-  echo "Existing ReForge deployment is missing .env; restore its credentials from backup before upgrading." >&2
-  exit 1
-fi
-# Do not copy a local checkout into an unrelated populated destination.
-if [[ -f "./infra/docker-compose.yml" && "$(pwd -P)" != "${ROOT}" &&
-      -d "${ROOT}" && ! -f "${ROOT}/infra/docker-compose.yml" && ! -f "${ROOT}/.env" &&
-      -n "$(ls -A "${ROOT}" 2>/dev/null || true)" ]]; then
-  echo "REFORGE_ROOT contains unrelated files; refusing to overwrite them." >&2
-  exit 1
-fi
-if [[ -L "${ROOT}/.env" ]]; then
-  echo "Refusing to use a symlinked production .env file." >&2
-  exit 1
-fi
-if [[ -e "${ROOT}/.env" ]]; then
-  if [[ ! -f "${ROOT}/.env" ]] ||
-     ! grep -q '^REFORGE_WORKER_TOKEN=.' "${ROOT}/.env" ||
-     ! grep -q '^REFORGE_DB_DSN=.' "${ROOT}/.env"; then
-    echo "Existing .env is invalid; refusing to modify installed code." >&2
-    exit 1
-  fi
-fi
-# Reject invalid explicit web ports before changing deployment files. An upgrade
-# keeps its persisted port; fresh installs may request a different starting port.
-if [[ ! -f "${ROOT}/.env" && -n "${REFORGE_WEB_PORT:-}" ]]; then
-  if [[ ! "${REFORGE_WEB_PORT}" =~ ^[1-9][0-9]{3,4}$ ]] ||
-     (( 10#${REFORGE_WEB_PORT} < 1024 || 10#${REFORGE_WEB_PORT} > 65535 )); then
-    echo "REFORGE_WEB_PORT must be an integer from 1024 to 65535." >&2
-    exit 1
-  fi
-fi
-# Validate explicit fresh-install choices before copying or cloning deployed code.
-# Existing installations retain their persisted database and service configuration.
-if [[ ! -f "${ROOT}/.env" ]]; then
-  case "${REFORGE_DB_CHOICE:-}" in
-    ""|1|2|3) ;;
-    *) echo "Invalid database selection (expected 1, 2, or 3)." >&2; exit 1 ;;
-  esac
-  for SERVICE_VALUE in "${REFORGE_ENABLE_MONGODB:-}" "${REFORGE_ENABLE_NEO4J:-}"; do
-    case "${SERVICE_VALUE,,}" in
-      ""|y|yes|1|n|no|0) ;;
-      *) echo "Optional service selections must be yes/no, y/n, or 1/0." >&2; exit 1 ;;
-    esac
-  done
-fi
 if [[ -f "./infra/docker-compose.yml" ]]; then
   mkdir -p "${ROOT}"
   if [[ "$(pwd)" != "${ROOT}" ]]; then
