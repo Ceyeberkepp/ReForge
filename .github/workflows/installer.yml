@@ -20,6 +20,21 @@ jobs:
       - uses: actions/checkout@v5
       - name: Bash syntax
         run: bash -n install.sh
+      - name: Verify preflight precedes host mutations
+        run: |
+          set -euo pipefail
+          preflight_line="$(grep -n '^ROOT=' install.sh | head -1 | cut -d: -f1)"
+          apt_line="$(grep -n '^apt-get update' install.sh | head -1 | cut -d: -f1)"
+          docker_line="$(grep -n '^systemctl enable --now docker' install.sh | head -1 | cut -d: -f1)"
+          test -n "$preflight_line" && test -n "$apt_line" && test -n "$docker_line"
+          test "$preflight_line" -lt "$apt_line"
+          test "$preflight_line" -lt "$docker_line"
+          awk 'BEGIN{copy=0} /^ROOT=/{copy=1} copy && $0 == "echo \"[1/6] Installing base system dependencies...\"" {exit} copy{print}' install.sh > /tmp/reforge-preflight-order.sh
+          test -s /tmp/reforge-preflight-order.sh
+          if REFORGE_ROOT=/ bash /tmp/reforge-preflight-order.sh; then
+            echo "Unsafe install root unexpectedly accepted" >&2
+            exit 1
+          fi
       - name: Verify source-copy does not replace deployed secrets
         run: |
           set -euo pipefail
