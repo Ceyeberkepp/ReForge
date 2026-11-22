@@ -328,6 +328,30 @@ jobs:
           git -C "$src" -c user.name=CI -c user.email=ci@example.invalid commit --allow-empty -qm initial
           git clone -q "$src" "$dest"
           test -d "$dest/.git"
+      - name: Installer refuses failed SQL initialization and unhealthy API
+        run: |
+          set -euo pipefail
+          bash -n install.sh
+          # SQL readiness is explicitly gated after the retry loop.
+          sed -n '/^  SQLSERVER_READY=false$/,/^  if \[\[ "\$SQLSERVER_READY" != true \]\]; then$/p' install.sh | grep -q 'SQLSERVER_READY=true'
+          grep -q 'SQL Server database initialization did not succeed' install.sh
+          # Extract the actual readiness block to exercise fail-closed behavior.
+          sed -n '/^HEALTH_READY=false$/,/^if \[\[ "\$HEALTH_READY" != true \]\]; then$/p' install.sh | sed '$d' > /tmp/reforge-health-loop.sh
+          test -s /tmp/reforge-health-loop.sh
+          # All requests should fail quickly: test harness overrides curl and sleep.
+          cat > /tmp/reforge-health-test.sh <<'EOF'
+          set -euo pipefail
+          WEB_PORT=5173
+          curl() { return 7; }
+          sleep() { :; }
+          source /tmp/reforge-health-loop.sh
+          test "$HEALTH_READY" = false
+          EOF
+          bash /tmp/reforge-health-test.sh
+          # A correct health response causes successful early termination.
+          sed -i 's/curl() { return 7; }/curl() { printf "{\\"status\\":\\"ok\\"}"; }/' /tmp/reforge-health-test.sh
+          sed -i 's/test "\$HEALTH_READY" = false/test "\$HEALTH_READY" = true/' /tmp/reforge-health-test.sh
+          bash /tmp/reforge-health-test.sh
       - name: Compose configuration
         run: docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
       - name: Check overridable web port
