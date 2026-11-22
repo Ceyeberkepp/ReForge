@@ -73,6 +73,41 @@ jobs:
             echo "Root filesystem unexpectedly accepted" >&2
             exit 1
           fi
+      - name: Reject nonregular credential paths without blocking
+        run: |
+          set -euo pipefail
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-filetype-preflight.sh
+          test -s /tmp/reforge-filetype-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          # Identify the destination as an existing deployment so the unrelated
+          # populated-directory guard cannot mask the file-type check.
+          mkdir -p "$root/infra"
+          touch "$root/infra/docker-compose.yml"
+          mkfifo "$root/.env"
+          if timeout 5 env REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh 2>"$root/err"; then
+            echo "FIFO credential path unexpectedly accepted" >&2
+            exit 1
+          else
+            code=$?
+            test "$code" -ne 124
+            grep -q 'Existing .env must be a regular credential file' "$root/err"
+          fi
+          rm "$root/.env"
+          mkdir "$root/.env"
+          if timeout 5 env REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh 2>"$root/err"; then
+            echo "Directory credential path unexpectedly accepted" >&2
+            exit 1
+          else
+            code=$?
+            test "$code" -ne 124
+            grep -q 'Existing .env must be a regular credential file' "$root/err"
+          fi
+          rmdir "$root/.env"
+          printf 'REFORGE_WORKER_TOKEN=original\nREFORGE_DB_DSN=original-dsn\n' > "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh
+          grep -qx 'REFORGE_WORKER_TOKEN=original' "$root/.env"
+          grep -qx 'REFORGE_DB_DSN=original-dsn' "$root/.env"
       - name: Reject ambiguous persisted credentials before mutation
         run: |
           set -euo pipefail
