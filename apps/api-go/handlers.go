@@ -28,13 +28,19 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"detail": "invalid request"})
 		return
 	}
+	if failedLogins.blocked(input.Username, time.Now().UTC()) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"detail": "too many login attempts; retry later"})
+		return
+	}
 	var u User
 	if a.db.First(&u, "username = ? AND disabled = ?", input.Username, false).Error != nil || !verifyPassword(u.PasswordHash, input.Password) {
+		failedLogins.fail(input.Username, time.Now().UTC())
 		a.audit(r, "login", "session", "", false, "invalid credentials")
 		time.Sleep(250 * time.Millisecond)
 		writeJSON(w, 401, map[string]string{"detail": "invalid credentials"})
 		return
 	}
+	failedLogins.clear(input.Username)
 	s := Session{
 		Token:     randomToken(48),
 		UserID:    u.ID,
