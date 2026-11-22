@@ -80,10 +80,10 @@ jobs:
           test -s /tmp/reforge-credential-preflight.sh
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
-          printf 'REFORGE_WORKER_TOKEN=original\\nREFORGE_DB_DSN=original-dsn\\n' > "$root/.env"
+          printf 'REFORGE_WORKER_TOKEN=original\nREFORGE_DB_DSN=original-dsn\n' > "$root/.env"
           REFORGE_ROOT="$root" bash /tmp/reforge-credential-preflight.sh
           for key in REFORGE_WORKER_TOKEN REFORGE_DB_DSN; do
-            printf '%s=conflicting\\n' "$key" >> "$root/.env"
+            printf '%s=conflicting\n' "$key" >> "$root/.env"
             if REFORGE_ROOT="$root" bash /tmp/reforge-credential-preflight.sh; then
               echo "Duplicate $key unexpectedly accepted" >&2
               exit 1
