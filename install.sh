@@ -381,6 +381,7 @@ if [[ "${DB_CHOICE}" == "3" ]]; then
   echo "Starting Microsoft SQL Server..."
   docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml --profile sqlserver up -d sqlserver
   echo "Waiting for SQL Server..."
+  SQLSERVER_READY=false
   for _ in $(seq 1 45); do
     if docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml exec -T sqlserver bash -lc '
       SQLCMD=""
@@ -388,10 +389,15 @@ if [[ "${DB_CHOICE}" == "3" ]]; then
       [[ -z "$SQLCMD" && -x /opt/mssql-tools/bin/sqlcmd ]] && SQLCMD=/opt/mssql-tools/bin/sqlcmd
       [[ -n "$SQLCMD" ]] && "$SQLCMD" -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "IF DB_ID('"'"'reforge'"'"') IS NULL CREATE DATABASE reforge" >/dev/null
     '; then
+      SQLSERVER_READY=true
       break
     fi
     sleep 2
   done
+  if [[ "$SQLSERVER_READY" != true ]]; then
+    echo "SQL Server database initialization did not succeed; refusing to report a successful installation." >&2
+    exit 1
+  fi
 fi
 fi
 
@@ -400,9 +406,26 @@ docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml up -d --bui
 
 echo "[6/6] Verifying ReForge services..."
 docker compose --env-file "${ROOT}/.env" -f infra/docker-compose.yml ps
+# Container start does not establish that the API and database are usable.
+# Test the published web endpoint (which proxies /health) with a bounded retry.
+WEB_PORT="$(sed -n 's/^REFORGE_WEB_PORT=//p' .env | tail -n 1)"
+WEB_PORT="${WEB_PORT:-5173}"
+HEALTH_READY=false
+for _ in $(seq 1 30); do
+  if curl --noproxy '*' --fail --silent --show-error --max-time 3 \
+      "http://127.0.0.1:${WEB_PORT}/health" 2>/dev/null | grep -q '"status":"ok"'; then
+    HEALTH_READY=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$HEALTH_READY" != true ]]; then
+  echo "ReForge API did not become healthy through the web endpoint; refusing to report successful installation." >&2
+  exit 1
+fi
 
 echo
-echo "ReForge services started. Check the health output above before production use."
+echo "ReForge API health verified through the web endpoint."
 WEB_PORT="$(sed -n 's/^REFORGE_WEB_PORT=//p' .env | tail -n 1)"
 WEB_PORT="${WEB_PORT:-5173}"
 echo "Web UI: http://${HOST_IP}:${WEB_PORT}"
