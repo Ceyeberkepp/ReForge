@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"io"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -20,7 +21,10 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if json.NewDecoder(r.Body).Decode(&input) != nil {
+	// Bound unauthenticated login payloads before JSON parsing and password work.
+	// Require exactly one JSON object; trailing content is not a valid login.
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
+	if decoder.Decode(&input) != nil || decoder.Decode(new(any)) != io.EOF {
 		writeJSON(w, 400, map[string]string{"detail": "invalid request"})
 		return
 	}
