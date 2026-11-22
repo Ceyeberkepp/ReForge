@@ -1,9 +1,14 @@
 package main
 
+import "strings"
+
 // PXE requests must only create recognized tasks. An absent source is
 // supported for capture, but all restore/install operations require an
-// explicit source ID.
+// explicit, canonical source ID.
 func validPXEActionType(action, sourceType, sourceID string) bool {
+ // Do not normalize source IDs: the caller must supply the exact identifier.
+ // Whitespace-only or padded IDs must not be treated as valid image references.
+ if sourceID != strings.TrimSpace(sourceID) { return false }
  switch action {
  case "install":
   if sourceID == "" { return false }
