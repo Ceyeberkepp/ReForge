@@ -23,7 +23,7 @@ func (l *loginFailures) blocked(username string, now time.Time) bool {
  l.mu.Lock()
  defer l.mu.Unlock()
  e, ok := l.entries[key]
- if !ok { return false }
+ if !ok { return len(l.entries) >= 10000 }
  if !now.Before(e.until) { delete(l.entries,key); return false }
  return e.count >= 5
 }
@@ -34,7 +34,7 @@ func (l *loginFailures) fail(username string, now time.Time) {
  // Bound memory for arbitrary usernames; evict expired records first.
  if len(l.entries) >= 10000 {
   for k, e := range l.entries { if !now.Before(e.until) { delete(l.entries,k) } }
-  if len(l.entries) >= 10000 { return } // never evict active lockouts
+  if len(l.entries) >= 10000 { return } // unknown accounts fail closed while saturated
  }
  e := l.entries[key]
  if !now.Before(e.until) { e = loginFailure{until: now.Add(15*time.Minute)} }
