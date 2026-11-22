@@ -32,9 +32,18 @@ func (l *loginFailures) fail(username string, now time.Time) {
  l.mu.Lock()
  defer l.mu.Unlock()
  // Bound memory for arbitrary usernames; evict expired records first.
- if len(l.entries) >= 10000 {
-  for k, e := range l.entries { if !now.Before(e.until) { delete(l.entries,k) } }
-  if len(l.entries) >= 10000 { return } // unknown accounts fail closed while saturated
+ if _, exists := l.entries[key]; !exists && len(l.entries) >= 10000 {
+  // Evict expired records first; if all are active, evict the earliest
+  // expiry so an attacker cannot disable throttling by filling the map.
+  var oldestKey string
+  var oldestUntil time.Time
+  for k, e := range l.entries {
+   if !now.Before(e.until) { delete(l.entries, k); continue }
+   if oldestKey == "" || e.until.Before(oldestUntil) {
+    oldestKey, oldestUntil = k, e.until
+   }
+  }
+  if len(l.entries) >= 10000 && oldestKey != "" { delete(l.entries, oldestKey) }
  }
  e := l.entries[key]
  if !now.Before(e.until) { e = loginFailure{until: now.Add(15*time.Minute)} }
