@@ -8,11 +8,16 @@ func TestValidPXEActionType(t *testing.T) {
   {"install","iso","iso1",true},
   {"install","clone","clone1",true},
   {"install","clone","",false},
+  {"install","gold"," ",false},
+  {"install","iso","\t",false},
+  {"install","clone"," clone1",false},
+  {"install","gold","img1 ",false},
   {"install","other","img1",false},
   {"capture","clone","",true},
   {"capture","gold","",true},
   {"capture","iso","",false},
   {"capture","clone","some-id",false},
+  {"capture","gold"," ",false},
   {"wipe","clone","clone1",false},
  }
  for _, c:=range cases { if got:=validPXEActionType(c.a,c.typ,c.id);got!=c.ok {t.Errorf("%q/%q/%q got %t want %t",c.a,c.typ,c.id,got,c.ok)} }
