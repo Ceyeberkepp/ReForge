@@ -130,6 +130,33 @@ jobs:
           rm "$root/.env"
           printf 'REFORGE_WORKER_TOKEN=original\nREFORGE_DB_DSN=original-dsn\n' > "$root/.env"
           REFORGE_ROOT="$root" bash /tmp/reforge-hardlink-preflight.sh
+      - name: Reject exposed production credentials without changing them
+        run: |
+          set -euo pipefail
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \\"./infra/docker-compose.yml\\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-private-env-preflight.sh
+          test -s /tmp/reforge-private-env-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          mkdir -p "$root/infra"
+          touch "$root/infra/docker-compose.yml"
+          printf 'REFORGE_WORKER_TOKEN=original\\nREFORGE_DB_DSN=original-dsn\\n' > "$root/.env"
+          chmod 644 "$root/.env"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-private-env-preflight.sh 2>"$root/err"; then
+            echo "World-readable production credentials unexpectedly accepted" >&2
+            exit 1
+          fi
+          grep -q 'Existing .env permissions expose credentials' "$root/err"
+          test "$(stat -c %a "$root/.env")" = 644
+          grep -qx 'REFORGE_WORKER_TOKEN=original' "$root/.env"
+          grep -qx 'REFORGE_DB_DSN=original-dsn' "$root/.env"
+          chmod 640 "$root/.env"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-private-env-preflight.sh 2>"$root/err"; then
+            echo "Group-readable production credentials unexpectedly accepted" >&2
+            exit 1
+          fi
+          grep -q 'Existing .env permissions expose credentials' "$root/err"
+          chmod 600 "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-private-env-preflight.sh
       - name: Reject ambiguous persisted credentials before mutation
         run: |
           set -euo pipefail
