@@ -73,6 +73,25 @@ jobs:
             echo "Root filesystem unexpectedly accepted" >&2
             exit 1
           fi
+      - name: Reject ambiguous persisted credentials before mutation
+        run: |
+          set -euo pipefail
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-credential-preflight.sh
+          test -s /tmp/reforge-credential-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          printf 'REFORGE_WORKER_TOKEN=original\nREFORGE_DB_DSN=original-dsn\n' > "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-credential-preflight.sh
+          for key in REFORGE_WORKER_TOKEN REFORGE_DB_DSN; do
+            printf '%s=conflicting\n' "$key" >> "$root/.env"
+            if REFORGE_ROOT="$root" bash /tmp/reforge-credential-preflight.sh; then
+              echo "Duplicate $key unexpectedly accepted" >&2
+              exit 1
+            fi
+            sed -i '$d' "$root/.env"
+          done
+          grep -qx 'REFORGE_WORKER_TOKEN=original' "$root/.env"
+          grep -qx 'REFORGE_DB_DSN=original-dsn' "$root/.env"
       - name: Reject redirected or relative install roots
         run: |
           set -euo pipefail

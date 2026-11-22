@@ -67,6 +67,15 @@ if [[ -L "${ROOT}/.env" ]]; then
   exit 1
 fi
 if [[ -e "${ROOT}/.env" ]]; then
+  # Different dotenv readers may resolve repeated credentials differently.
+  # Reject ambiguity before packages, services, or deployed files change.
+  for SECRET_KEY in REFORGE_WORKER_TOKEN REFORGE_DB_DSN; do
+    SECRET_COUNT="$(grep -c "^${SECRET_KEY}=" "${ROOT}/.env" || true)"
+    if [[ "${SECRET_COUNT}" != 1 ]]; then
+      echo "Existing .env must contain exactly one ${SECRET_KEY}; repair before upgrading." >&2
+      exit 1
+    fi
+  done
   if [[ ! -f "${ROOT}/.env" ]] ||
      ! grep -q '^REFORGE_WORKER_TOKEN=.' "${ROOT}/.env" ||
      ! grep -q '^REFORGE_DB_DSN=.' "${ROOT}/.env"; then
