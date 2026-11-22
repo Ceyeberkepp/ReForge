@@ -76,7 +76,7 @@ jobs:
       - name: Reject nonregular credential paths without blocking
         run: |
           set -euo pipefail
-          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \\"./infra/docker-compose.yml\\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-filetype-preflight.sh
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-filetype-preflight.sh
           test -s /tmp/reforge-filetype-preflight.sh
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
