@@ -71,6 +71,16 @@ if [[ -f "${ROOT}/.env" ]] && (( $(stat -c %h -- "${ROOT}/.env") != 1 )); then
   echo "Existing .env must not be hardlinked; refusing unsafe upgrade." >&2
   exit 1
 fi
+# Production credentials must not be readable by group or other users.
+# Refuse unsafe permissions before copying code or invoking package managers;
+# do not silently chmod a pre-existing production file.
+if [[ -f "${ROOT}/.env" ]]; then
+  ENV_MODE="$(stat -c %a -- "${ROOT}/.env")"
+  if (( (8#${ENV_MODE} & 077) != 0 )); then
+    echo "Existing .env permissions expose credentials to group or others; set mode 600 before upgrading." >&2
+    exit 1
+  fi
+fi
 # A previously deployed Compose stack without its credential file must not be
 # treated as a new install. That would silently generate different database
 # credentials against persistent volumes and strand existing data.
