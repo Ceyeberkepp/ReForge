@@ -65,6 +65,12 @@ if [[ -L "${ROOT}/.env" ]]; then
   echo "Refusing to use a symlinked production .env file." >&2
   exit 1
 fi
+# A hardlinked .env shares an inode with another path. Appending an upgrade
+# setting would silently change that other file, so fail before host mutation.
+if [[ -f "${ROOT}/.env" ]] && (( $(stat -c %h -- "${ROOT}/.env") != 1 )); then
+  echo "Existing .env must not be hardlinked; refusing unsafe upgrade." >&2
+  exit 1
+fi
 # A previously deployed Compose stack without its credential file must not be
 # treated as a new install. That would silently generate different database
 # credentials against persistent volumes and strand existing data.

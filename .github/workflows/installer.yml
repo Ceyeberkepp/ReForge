@@ -108,6 +108,28 @@ jobs:
           REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh
           grep -qx 'REFORGE_WORKER_TOKEN=original' "$root/.env"
           grep -qx 'REFORGE_DB_DSN=original-dsn' "$root/.env"
+      - name: Reject hardlinked credentials without altering linked file
+        run: |
+          set -euo pipefail
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-hardlink-preflight.sh
+          test -s /tmp/reforge-hardlink-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          mkdir -p "$root/infra"
+          touch "$root/infra/docker-compose.yml"
+          printf 'REFORGE_WORKER_TOKEN=original\nREFORGE_DB_DSN=original-dsn\n' > "$root/other-credentials"
+          ln "$root/other-credentials" "$root/.env"
+          if REFORGE_ROOT="$root" bash /tmp/reforge-hardlink-preflight.sh 2>"$root/err"; then
+            echo "Hardlinked credentials unexpectedly accepted" >&2
+            exit 1
+          fi
+          grep -q 'Existing .env must not be hardlinked' "$root/err"
+          test "$(stat -c %h "$root/.env")" -eq 2
+          grep -qx 'REFORGE_WORKER_TOKEN=original' "$root/other-credentials"
+          grep -qx 'REFORGE_DB_DSN=original-dsn' "$root/other-credentials"
+          rm "$root/.env"
+          printf 'REFORGE_WORKER_TOKEN=original\nREFORGE_DB_DSN=original-dsn\n' > "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-hardlink-preflight.sh
       - name: Reject ambiguous persisted credentials before mutation
         run: |
           set -euo pipefail
