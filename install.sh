@@ -62,6 +62,12 @@ if [[ -f "./infra/docker-compose.yml" && "$(pwd -P)" != "${ROOT}" &&
   echo "REFORGE_ROOT contains unrelated files; refusing to overwrite them." >&2
   exit 1
 fi
+# Refuse FIFOs, sockets, devices and directories before any credential reads.
+# A FIFO can otherwise hang the installer during grep-based preflight.
+if [[ -e "${ROOT}/.env" && ! -f "${ROOT}/.env" ]]; then
+  echo "Existing .env must be a regular credential file; refusing unsafe upgrade." >&2
+  exit 1
+fi
 if [[ -L "${ROOT}/.env" ]]; then
   echo "Refusing to use a symlinked production .env file." >&2
   exit 1
