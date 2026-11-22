@@ -23,7 +23,7 @@ func (l *loginFailures) blocked(username string, now time.Time) bool {
  l.mu.Lock()
  defer l.mu.Unlock()
  e, ok := l.entries[key]
- if !ok { return len(l.entries) >= 10000 }
+ if !ok { return false }
  if !now.Before(e.until) { delete(l.entries,key); return false }
  return e.count >= 5
 }
