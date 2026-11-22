@@ -73,6 +73,27 @@ jobs:
             echo "Root filesystem unexpectedly accepted" >&2
             exit 1
           fi
+      - name: Reject nonregular credential paths without blocking
+        run: |
+          set -euo pipefail
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \\"./infra/docker-compose.yml\\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-filetype-preflight.sh
+          test -s /tmp/reforge-filetype-preflight.sh
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          mkfifo "$root/.env"
+          if timeout 5 env REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh; then
+            echo "FIFO credential path unexpectedly accepted" >&2
+            exit 1
+          fi
+          rm "$root/.env"
+          mkdir "$root/.env"
+          if timeout 5 env REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh; then
+            echo "Directory credential path unexpectedly accepted" >&2
+            exit 1
+          fi
+          rmdir "$root/.env"
+          printf 'REFORGE_WORKER_TOKEN=original\\nREFORGE_DB_DSN=original-dsn\\n' > "$root/.env"
+          REFORGE_ROOT="$root" bash /tmp/reforge-filetype-preflight.sh
       - name: Reject ambiguous persisted credentials before mutation
         run: |
           set -euo pipefail
