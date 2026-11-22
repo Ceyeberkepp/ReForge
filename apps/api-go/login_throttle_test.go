@@ -2,6 +2,7 @@ package main
 
 import (
  "testing"
+ "fmt"
  "time"
 )
 func TestLoginFailuresWindow(t *testing.T) {
@@ -20,4 +21,15 @@ func TestLoginFailuresClear(t *testing.T) {
  for i:=0;i<5;i++ { l.fail("admin",now) }
  l.clear("admin")
  if l.blocked("admin",now) { t.Fatal("successful login must clear failures") }
+}
+
+func TestLoginFailuresSaturatedMapStillCountsNewUser(t *testing.T) {
+ l := loginFailures{entries: map[string]loginFailure{}}
+ now := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
+ for i := 0; i < 10000; i++ {
+  l.entries[fmt.Sprintf("account-%d", i)] = loginFailure{count: 1, until: now.Add(15*time.Minute)}
+ }
+ for i := 0; i < 5; i++ { l.fail("target", now) }
+ if !l.blocked("target", now) { t.Fatal("saturated map bypassed throttle") }
+ if len(l.entries) > 10000 { t.Fatal("throttle map grew past limit") }
 }
