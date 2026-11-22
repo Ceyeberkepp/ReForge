@@ -133,7 +133,7 @@ jobs:
       - name: Reject exposed production credentials without changing them
         run: |
           set -euo pipefail
-          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \\"./infra/docker-compose.yml\\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-private-env-preflight.sh
+          awk 'BEGIN{copy=0} /^ROOT="/{copy=1} copy && $0 == "if [[ -f \"./infra/docker-compose.yml\" ]]; then" {exit} copy{print}' install.sh > /tmp/reforge-private-env-preflight.sh
           test -s /tmp/reforge-private-env-preflight.sh
           root="$(mktemp -d)"
           trap 'rm -rf "$root"' EXIT
