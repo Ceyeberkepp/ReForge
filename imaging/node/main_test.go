@@ -90,3 +90,34 @@ func TestRejectsAmbiguousManifestsBeforeRestore(t *testing.T) {
   })
  }
 }
+
+
+func TestRejectsSymlinkManifestBeforeRestore(t *testing.T) {
+ dir := t.TempDir()
+ src := filepath.Join(dir, "source")
+ image := filepath.Join(dir, "image")
+ target := filepath.Join(dir, "target")
+ if err := os.WriteFile(src, []byte("trusted bytes"), 0600); err != nil { t.Fatal(err) }
+ if err := capture(src, image); err != nil { t.Fatal(err) }
+ manifest := image + ".json"
+ originalManifest := filepath.Join(dir, "saved-manifest.json")
+ if err := os.Rename(manifest, originalManifest); err != nil { t.Fatal(err) }
+ if err := os.Symlink(originalManifest, manifest); err != nil { t.Skip(err) }
+ if err := restore(image, target); err == nil { t.Fatal("symlinked manifest accepted") }
+ if _, err := os.Lstat(target); !os.IsNotExist(err) { t.Fatal("target created for symlinked manifest") }
+}
+
+func TestExistingRestoreTargetPreservesContents(t *testing.T) {
+ dir := t.TempDir()
+ src := filepath.Join(dir, "source")
+ image := filepath.Join(dir, "image")
+ target := filepath.Join(dir, "existing-target")
+ if err := os.WriteFile(src, []byte("image bytes"), 0600); err != nil { t.Fatal(err) }
+ if err := capture(src, image); err != nil { t.Fatal(err) }
+ original := []byte("do not overwrite")
+ if err := os.WriteFile(target, original, 0600); err != nil { t.Fatal(err) }
+ if err := restore(image, target); err == nil { t.Fatal("existing target accepted") }
+ after, err := os.ReadFile(target)
+ if err != nil { t.Fatal(err) }
+ if !bytes.Equal(after, original) { t.Fatal("existing target contents changed") }
+}
