@@ -42,7 +42,9 @@ func verifyPassword(encoded, password string) bool {
 	}
 	salt, err1 := base64.RawStdEncoding.DecodeString(parts[0])
 	want, err2 := base64.RawStdEncoding.DecodeString(parts[1])
-	if err1 != nil || err2 != nil {
+	// Reject malformed or oversized stored hashes before invoking Argon2.
+	// A corrupted hash must never control the derived-key output length.
+	if err1 != nil || err2 != nil || len(salt) != 16 || len(want) != 32 {
 		return false
 	}
 	got := argon2.IDKey([]byte(password), salt, 3, 64*1024, 2, uint32(len(want)))
